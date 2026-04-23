@@ -2,6 +2,7 @@ param(
   [string]$ConfigPath = "$PSScriptRoot\bridge.config.json",
   [string]$HostName = "127.0.0.1",
   [int]$Port = 8765,
+  [switch]$Restart,
   [switch]$NoBrowser
 )
 
@@ -24,7 +25,7 @@ if (-not (Test-Path -LiteralPath $bridge)) {
 }
 
 $pythonExe = Resolve-Python
-$config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+$config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $stateDir = [string]$config.state_dir
 if (-not $stateDir) {
   $stateDir = Join-Path $env:USERPROFILE ".codex\tmp\feishu-codex-bridge"
@@ -35,12 +36,19 @@ $pidFile = Join-Path $stateDir "dashboard.pid"
 if (Test-Path -LiteralPath $pidFile) {
   $pidValue = Get-Content -LiteralPath $pidFile | Select-Object -First 1
   if ($pidValue -and (Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue)) {
-    $url = "http://${HostName}:$Port/"
-    if (-not $NoBrowser) { Start-Process $url }
-    Write-Output "Dashboard already running: $url"
-    exit 0
+    if ($Restart) {
+      Stop-Process -Id ([int]$pidValue) -Force
+      Remove-Item -LiteralPath $pidFile -Force
+      Start-Sleep -Milliseconds 500
+    } else {
+      $url = "http://${HostName}:$Port/"
+      if (-not $NoBrowser) { Start-Process $url }
+      Write-Output "Dashboard already running: $url"
+      exit 0
+    }
+  } else {
+    Remove-Item -LiteralPath $pidFile -Force
   }
-  Remove-Item -LiteralPath $pidFile -Force
 }
 
 $out = Join-Path $stateDir "dashboard.stdout.log"

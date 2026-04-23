@@ -6,7 +6,7 @@ $ErrorActionPreference = "SilentlyContinue"
 
 $state = Join-Path $env:USERPROFILE ".codex\tmp\feishu-codex-bridge"
 if (Test-Path -LiteralPath $ConfigPath) {
-  $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+  $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
   if ($config.state_dir) {
     $state = [string]$config.state_dir
   }
@@ -27,10 +27,20 @@ foreach ($pidFile in $pidFiles) {
   }
 }
 
+Get-CimInstance Win32_Process -Filter "name='python.exe'" | Where-Object {
+  $_.CommandLine -match 'feishu_codex_bridge\.py' -and (
+    $_.CommandLine -match '--dashboard-only' -or
+    $_.CommandLine -match '--no-dashboard-server' -or
+    $_.CommandLine -match '--private-poller-only'
+  )
+} | ForEach-Object {
+  Stop-Process -Id $_.ProcessId -Force
+}
+
 $jobsDir = Join-Path $state "jobs"
 if (Test-Path -LiteralPath $jobsDir) {
   Get-ChildItem -LiteralPath $jobsDir -Filter "job-*.json" | ForEach-Object {
-    $job = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+    $job = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($job.status -in @("queued", "running")) {
       foreach ($pidName in @("worker_pid", "runner_pid", "codex_pid")) {
         $pidValue = $job.$pidName

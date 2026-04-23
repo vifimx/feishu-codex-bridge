@@ -46,7 +46,7 @@ function Protect-SecretPath {
 function Read-StoredSecret {
   param([string]$Path)
   if (-not (Test-Path -LiteralPath $Path)) { return $null }
-  $profile = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+  $profile = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
   if (-not $profile.app_secret) { return $null }
   return $profile
 }

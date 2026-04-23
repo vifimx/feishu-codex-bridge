@@ -6,26 +6,214 @@
   "workspaces": {
     "default": "C:\\path\\to\\workspace"
   },
-  "authorized_sender_open_ids": [
-    "ou_xxx"
-  ],
-  "access": {
-    "trusted_sender_open_ids": [
-      "ou_admin_xxx"
-    ],
-    "limited_sender_open_ids": [
-      "ou_limited_xxx"
-    ],
-    "limited_allowed_commands": [
+  "commands": {
+    "available": [
       "help",
       "status",
       "history",
       "capabilities",
-      "peers"
-    ],
-    "limited_allowed_task_ids": [
+      "peers",
+      "sessions",
+      "new-session",
+      "doctor",
+      "auth",
       "review-update"
+    ]
+  },
+  "skills": {
+    "available": [
+      "feishu",
+      "lark-im",
+      "lark-event",
+      "feishu-codex-bridge"
+    ]
+  },
+  "models": {
+    "available": [
+      {
+        "id": "gpt-5.4",
+        "label": "gpt-5.4",
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "label": "gpt-5.4-mini",
+        "reasoning_efforts": [
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ]
+      }
     ],
+    "default": {
+      "model": "gpt-5.4",
+      "reasoning_effort": "medium",
+      "service_tier": "fast"
+    },
+    "fast": {
+      "model": "gpt-5.4-mini",
+      "reasoning_effort": "low",
+      "service_tier": "fast"
+    }
+  },
+  "access": {
+    "default_policy": {
+      "allow_codex": false,
+      "unrestricted": false,
+      "show_details": false,
+      "show_progress": false,
+      "commands": [
+        "help",
+        "status",
+        "history",
+        "capabilities",
+        "sessions"
+      ],
+      "tasks": [],
+      "skills": [],
+      "models": []
+    },
+    "identities": {
+      "admin": {
+        "label": "Admin User",
+        "open_ids": [
+          "ou_admin_xxx"
+        ],
+        "emails": [
+          "admin@example.com"
+        ],
+        "aliases": [
+          "admin"
+        ],
+        "allow_codex": true,
+        "unrestricted": true,
+        "show_details": false,
+        "show_progress": false,
+        "commands": [
+          "*"
+        ],
+        "tasks": [
+          "*"
+        ],
+        "skills": [
+          "*"
+        ],
+        "models": [
+          "*"
+        ]
+      },
+      "reviewer": {
+        "label": "Reviewer",
+        "open_ids": [
+          "ou_limited_xxx"
+        ],
+        "emails": [
+          "reviewer@example.com"
+        ],
+        "aliases": [
+          "reviewer"
+        ],
+        "allow_codex": false,
+        "unrestricted": false,
+        "show_details": false,
+        "show_progress": false,
+        "commands": [
+          "help",
+          "status",
+          "history"
+        ],
+        "tasks": [
+          "review-update"
+        ],
+        "skills": [
+          "feishu",
+          "lark-doc",
+          "lark-base",
+          "lark-sheets"
+        ],
+        "models": [
+          "gpt-5.4-mini"
+        ]
+      }
+    },
+    "user_groups": {
+      "review-team": {
+        "label": "Review Team",
+        "enabled": true,
+        "members": [
+          "reviewer"
+        ],
+        "allow_codex": false,
+        "unrestricted": false,
+        "show_details": false,
+        "show_progress": false,
+        "commands": [
+          "help",
+          "status",
+          "history",
+          "sessions"
+        ],
+        "tasks": [
+          "review-update"
+        ],
+        "skills": [
+          "feishu",
+          "lark-doc",
+          "lark-base",
+          "lark-sheets"
+        ],
+        "models": [
+          "gpt-5.4-mini"
+        ]
+      }
+    },
+    "groups": {
+      "botx-test": {
+        "label": "botx test group",
+        "chat_ids": [
+          "oc_group_xxx"
+        ],
+        "enabled": true,
+        "members": [
+          "admin",
+          "reviewer"
+        ],
+        "allow_codex": true,
+        "unrestricted": false,
+        "show_details": false,
+        "show_progress": false,
+        "commands": [
+          "help",
+          "status",
+          "history",
+          "capabilities",
+          "sessions",
+          "new-session",
+          "review-update"
+        ],
+        "tasks": [
+          "review-update"
+        ],
+        "skills": [
+          "feishu",
+          "lark-doc",
+          "lark-base",
+          "lark-sheets"
+        ],
+        "models": [
+          "gpt-5.4",
+          "gpt-5.4-mini"
+        ]
+      }
+    },
+    "resolve_contacts_enabled": false,
+    "contact_cache_ttl_sec": 86400,
     "enable_preset_intent_matching": true,
     "deny_message": "This account can only run approved preset bridge tasks."
   },
@@ -63,7 +251,9 @@
     "default_workspace": "default",
     "codex_sandbox": "workspace-write",
     "codex_timeout_sec": 900,
+    "final_output_idle_grace_sec": 45,
     "codex_model": "",
+    "polling_fallback_enabled": false,
     "poll_interval_sec": 5,
     "treat_all_text_as_codex": true
   },
@@ -119,11 +309,26 @@
   },
   "jobs": {
     "max_concurrent": 1,
-    "history_limit": 200
+    "history_limit": 200,
+    "auto_cleanup_enabled": true,
+    "cleanup_delete_artifacts": true
   },
   "reply": {
     "max_chars": 3500,
-    "upload_full_output_file": true
+    "upload_full_output_file": true,
+    "edit_status_message": true,
+    "show_details_by_default": false,
+    "show_progress_by_default": false,
+    "progress_max_lines": 8,
+    "status_update_interval_sec": 10
+  },
+  "sessions": {
+    "enabled": true,
+    "private_scope": "chat",
+    "group_scope": "chat",
+    "continue_after_completion": true,
+    "queue_while_running": true,
+    "reply_guidance_enabled": true
   },
   "multimodal": {
     "download_incoming": true,
@@ -142,6 +347,8 @@
   },
   "dashboard": {
     "allow_config_write": true,
+    "allow_process_control": true,
+    "allow_shell_integration": true,
     "auto_refresh_sec": 5
   },
   "peers": {
