@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python runtime
+        run: python -m py_compile feishu_codex_bridge.py
+      - name: Validate example config JSON
+        shell: pwsh
+        run: |
+          Get-Content -Raw bridge.config.example.json | ConvertFrom-Json | Out-Null
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          foreach ($script in Get-ChildItem -Filter *.ps1) {
+            $null = [scriptblock]::Create((Get-Content -Raw $script.FullName))
+          }

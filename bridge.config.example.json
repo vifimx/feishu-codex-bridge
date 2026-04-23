@@ -1,0 +1,166 @@
+{
+  "protocol_version": "2",
+  "machine_id": "my-codex-machine",
+  "log_dir": "C:\\Users\\YOUR_USER\\.codex\\logs\\feishu-codex-bridge",
+  "state_dir": "C:\\Users\\YOUR_USER\\.codex\\tmp\\feishu-codex-bridge",
+  "workspaces": {
+    "default": "C:\\path\\to\\workspace"
+  },
+  "authorized_sender_open_ids": [
+    "ou_xxx"
+  ],
+  "access": {
+    "trusted_sender_open_ids": [
+      "ou_admin_xxx"
+    ],
+    "limited_sender_open_ids": [
+      "ou_limited_xxx"
+    ],
+    "limited_allowed_commands": [
+      "help",
+      "status",
+      "history",
+      "capabilities",
+      "peers"
+    ],
+    "limited_allowed_task_ids": [
+      "review-update"
+    ],
+    "enable_preset_intent_matching": true,
+    "deny_message": "This account can only run approved preset bridge tasks."
+  },
+  "capabilities": {
+    "modalities": [
+      "text",
+      "image",
+      "file",
+      "audio",
+      "video"
+    ],
+    "skills": [
+      "feishu",
+      "lark-im",
+      "lark-event",
+      "feishu-codex-bridge"
+    ],
+    "notes": [
+      "Text is transported as UTF-8 plain text.",
+      "Incoming image/file/audio/video resources are downloaded to local artifact paths when lark-cli can access the message resource.",
+      "Codex jobs run through the local codex CLI and keep session files under the local CODEX_HOME."
+    ]
+  },
+  "onboarding": {
+    "enabled": true
+  },
+  "private": {
+    "enabled": true,
+    "allowed_sender_open_ids": [
+      "ou_xxx"
+    ],
+    "allowed_chat_ids": [
+      "oc_xxx"
+    ],
+    "default_workspace": "default",
+    "codex_sandbox": "workspace-write",
+    "codex_timeout_sec": 900,
+    "codex_model": "",
+    "poll_interval_sec": 5,
+    "treat_all_text_as_codex": true
+  },
+  "public": {
+    "enabled": true,
+    "allowed_chat_ids": [
+      "oc_xxx"
+    ],
+    "allowed_sender_open_ids": [
+      "ou_xxx"
+    ],
+    "allow_codex": true,
+    "treat_all_text_as_codex": false,
+    "commands": {
+      "doctor": {
+        "executable": "lark-cli",
+        "args": [
+          "doctor"
+        ],
+        "timeout_sec": 60
+      },
+      "auth": {
+        "executable": "lark-cli",
+        "args": [
+          "auth",
+          "status"
+        ],
+        "timeout_sec": 60
+      }
+    }
+  },
+  "preset_tasks": {
+    "review-update": {
+      "enabled": true,
+      "description": "Update or prepare review-tracking content in Feishu documents from a meeting note, doc, or user-provided review request.",
+      "aliases": [
+        "review-update",
+        "评审更新",
+        "更新评审",
+        "技术方案评审",
+        "评审内容"
+      ],
+      "workspace": "default",
+      "required_skills": [
+        "feishu",
+        "lark-doc",
+        "lark-base",
+        "lark-sheets"
+      ],
+      "output_expectations": "Return what was found, what was updated, and any missing information. If the input is not enough to update safely, ask for the specific missing URL or field.",
+      "prompt_template": "Use the listed Feishu/Lark skills to handle only this preset task: update or prepare review-tracking content.\\n\\nRequired skills: {required_skills}\\nTask description: {description}\\nOutput expectations: {output_expectations}\\n\\nUser-provided input:\\n{input}\\n"
+    }
+  },
+  "jobs": {
+    "max_concurrent": 1,
+    "history_limit": 200
+  },
+  "reply": {
+    "max_chars": 3500,
+    "upload_full_output_file": true
+  },
+  "multimodal": {
+    "download_incoming": true,
+    "download_timeout_sec": 300,
+    "artifact_retention_days": 14
+  },
+  "routing": {
+    "accept_any_target": false,
+    "dispatch_to_peers": false,
+    "prefer_local_when_capable": true
+  },
+  "health_server": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "dashboard": {
+    "allow_config_write": true,
+    "auto_refresh_sec": 5
+  },
+  "peers": {
+    "enabled": false,
+    "nodes": []
+  },
+  "event_types": [
+    "im.chat.access_event.bot_p2p_chat_entered_v1",
+    "im.message.bot_muted_v1",
+    "im.message.message_read_v1",
+    "im.message.recalled_v1",
+    "im.message.receive_v1",
+    "p2p_chat_create"
+  ],
+  "codex_guardrails": [
+    "Use the current lark-cli configuration and existing app/user authorization.",
+    "Do not add Open Platform permissions, request new scopes, publish app versions, or change event subscriptions unless the user explicitly asks for that administrative change.",
+    "Bridge replies must use lark-cli --as bot.",
+    "For exact formatting or Chinese text, send plain UTF-8 text instead of markdown conversion unless rich rendering is explicitly needed.",
+    "If the task requires a capability that is not available under the current app policy, report the limitation instead of attempting an authorization workaround."
+  ]
+}

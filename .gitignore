@@ -1,0 +1,38 @@
+# Local runtime config and secrets
+bridge.config.json
+*.local.json
+*.secret.json
+.env
+.env.*
+.local/
+*.token
+*.pat
+github-auth.local.ps1
+
+# Runtime state/logs if copied into the repo
+tmp/
+state/
+logs/
+artifacts/
+jobs/
+*.pid
+*.log
+*.jsonl
+
+# Backups created by the dashboard config editor
+bridge.config.json.*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Windows / editors
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/

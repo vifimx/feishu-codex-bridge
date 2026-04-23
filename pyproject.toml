@@ -1,0 +1,13 @@
+[project]
+name = "feishu-codex-bridge"
+version = "0.1.0"
+description = "Local Feishu/Lark bot bridge for Codex CLI"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = []
+dependencies = []
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"

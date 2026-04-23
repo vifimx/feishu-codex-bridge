@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feishu Codex Bridge</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Local Bridge</p>
+        <h1>Feishu Codex Bridge</h1>
+      </div>
+      <div class="actions">
+        <button id="refreshBtn" type="button">Refresh</button>
+        <label class="toggle">
+          <input id="autoRefresh" type="checkbox" checked />
+          <span>Auto</span>
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <section class="overview" aria-label="Overview">
+        <div class="metric">
+          <span>Status</span>
+          <strong id="statusText">loading</strong>
+        </div>
+        <div class="metric">
+          <span>Machine</span>
+          <strong id="machineText">-</strong>
+        </div>
+        <div class="metric">
+          <span>Active Jobs</span>
+          <strong id="activeJobsText">-</strong>
+        </div>
+        <div class="metric">
+          <span>Refresh</span>
+          <strong id="refreshText">-</strong>
+        </div>
+      </section>
+
+      <section class="band">
+        <div class="section-head">
+          <div>
+            <h2>Jobs</h2>
+            <p id="jobSummary">No jobs loaded.</p>
+          </div>
+        </div>
+        <div class="job-grid" id="jobs"></div>
+      </section>
+
+      <section class="split">
+        <div class="panel">
+          <div class="section-head">
+            <h2>Configuration</h2>
+            <span id="configWriteState" class="pill">read</span>
+          </div>
+          <form id="configForm" class="config-form">
+            <label>
+              Sandbox
+              <select name="private.codex_sandbox">
+                <option value="workspace-write">workspace-write</option>
+                <option value="read-only">read-only</option>
+                <option value="danger-full-access">danger-full-access</option>
+              </select>
+            </label>
+            <label>
+              Timeout Seconds
+              <input name="private.codex_timeout_sec" type="number" min="60" step="30" />
+            </label>
+            <label>
+              Max Concurrent Jobs
+              <input name="jobs.max_concurrent" type="number" min="1" max="8" />
+            </label>
+            <label>
+              Reply Max Chars
+              <input name="reply.max_chars" type="number" min="500" step="100" />
+            </label>
+            <label>
+              Trusted Users
+              <textarea name="access.trusted_sender_open_ids" data-json="array" rows="3"></textarea>
+            </label>
+            <label>
+              Limited Users
+              <textarea name="access.limited_sender_open_ids" data-json="array" rows="3"></textarea>
+            </label>
+            <label>
+              Limited Commands
+              <textarea name="access.limited_allowed_commands" data-json="array" rows="3"></textarea>
+            </label>
+            <label>
+              Limited Tasks
+              <textarea name="access.limited_allowed_task_ids" data-json="array" rows="3"></textarea>
+            </label>
+            <label class="check">
+              <input name="public.allow_codex" type="checkbox" />
+              <span>Allow group /codex</span>
+            </label>
+            <label class="check">
+              <input name="public.treat_all_text_as_codex" type="checkbox" />
+              <span>Group plain text as Codex</span>
+            </label>
+            <label class="check">
+              <input name="private.treat_all_text_as_codex" type="checkbox" />
+              <span>Private plain text as Codex</span>
+            </label>
+            <label class="check">
+              <input name="multimodal.download_incoming" type="checkbox" />
+              <span>Download incoming media</span>
+            </label>
+            <label class="check">
+              <input name="routing.accept_any_target" type="checkbox" />
+              <span>Accept @any</span>
+            </label>
+            <label class="check">
+              <input name="routing.dispatch_to_peers" type="checkbox" />
+              <span>Dispatch to peers</span>
+            </label>
+            <label class="check">
+              <input name="access.enable_preset_intent_matching" type="checkbox" />
+              <span>Match preset task aliases</span>
+            </label>
+            <label class="wide">
+              Preset Tasks JSON
+              <textarea name="preset_tasks" data-json="object" rows="12"></textarea>
+            </label>
+            <button type="submit">Apply</button>
+          </form>
+          <p id="configMessage" class="message"></p>
+        </div>
+
+        <div class="panel">
+          <div class="section-head">
+            <h2>Capabilities</h2>
+          </div>
+          <div id="capabilities" class="kv"></div>
+        </div>
+      </section>
+
+      <section class="band">
+        <div class="section-head">
+          <h2>Recent Logs</h2>
+        </div>
+        <div id="logs" class="logs"></div>
+      </section>
+    </main>
+
+    <script src="/dashboard.js"></script>
+  </body>
+</html>
