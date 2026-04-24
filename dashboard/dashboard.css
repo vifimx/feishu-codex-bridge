@@ -302,6 +302,14 @@ button.danger:hover:not(:disabled) {
   margin-bottom: 10px;
 }
 
+.config-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .split {
   display: grid;
   grid-template-columns: 1fr;
@@ -400,6 +408,62 @@ button.danger:hover:not(:disabled) {
   font-size: 13px;
 }
 
+.field-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.option-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+}
+
+.option-help::after {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: min(300px, calc(100vw - 48px));
+  border: 1px solid rgba(20, 32, 51, 0.18);
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  padding: 9px 10px;
+  box-shadow: var(--shadow);
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  white-space: normal;
+}
+
+.option-help:hover::after,
+.option-help:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .config-form input,
 .config-form select,
 .config-form textarea {
@@ -419,6 +483,45 @@ button.danger:hover:not(:disabled) {
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.detected-options {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.runtime-options-wrap {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 14px;
+}
+
+.detected-option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 110px;
+  overflow: auto;
+}
+
+.detected-option-list code {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 3px 7px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+}
+
+.detected-option-list em {
+  color: var(--muted);
+  font-style: normal;
 }
 
 .config-form .check {
@@ -445,6 +548,23 @@ button.danger:hover:not(:disabled) {
   grid-column: 1 / -1;
   justify-self: start;
   min-width: 180px;
+}
+
+.config-actions-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 12px 0 0;
+  backdrop-filter: blur(8px);
+}
+
+.config-actions-bar button,
+.config-head-actions button {
+  min-width: 120px;
 }
 
 .access-editor-wrap {
@@ -531,6 +651,24 @@ button.danger:hover:not(:disabled) {
   background: #fff;
   padding: 14px;
   box-shadow: var(--shadow-soft);
+}
+
+.access-card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.access-card-toolbar strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.access-card-toolbar button {
+  min-height: 34px;
+  padding: 7px 10px;
 }
 
 .access-card-head,

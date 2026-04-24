@@ -128,9 +128,16 @@
         <div class="panel">
           <div class="section-head">
             <h2 data-i18n="configuration">Configuration</h2>
-            <span id="configWriteState" class="pill">read</span>
+            <div class="config-head-actions">
+              <span id="configWriteState" class="pill">read</span>
+              <button type="submit" form="configForm" data-config-action data-i18n="apply">Apply</button>
+            </div>
           </div>
           <form id="configForm" class="config-form">
+            <label class="wide">
+              <span data-i18n="codexHomeDir">Codex Config Directory</span>
+              <input name="codex.home_dir" type="text" autocomplete="off" placeholder="Default local .codex" />
+            </label>
             <label>
               <span data-i18n="sandbox">Sandbox</span>
               <select name="private.codex_sandbox">
@@ -229,7 +236,7 @@
             </label>
             <label class="check">
               <input name="routing.dispatch_to_peers" type="checkbox" />
-              <span data-i18n="dispatchToPeers">Dispatch to peers</span>
+              <span data-i18n="dispatchToPeers">Peer forwarding</span>
             </label>
             <label class="check">
               <input name="access.enable_preset_intent_matching" type="checkbox" />
@@ -237,7 +244,7 @@
             </label>
             <label class="check">
               <input name="access.resolve_contacts_enabled" type="checkbox" />
-              <span data-i18n="resolveContacts">Resolve contacts</span>
+              <span data-i18n="resolveContacts">Contact-assisted user matching</span>
             </label>
             <label>
               <span data-i18n="contactCacheTtl">Contact Cache TTL</span>
@@ -246,6 +253,17 @@
             <label class="check">
               <input name="sessions.enabled" type="checkbox" />
               <span data-i18n="sessionsEnabled">Continue conversations</span>
+            </label>
+            <label>
+              <span data-i18n="sessionMode">Conversation Mode</span>
+              <select name="sessions.mode">
+                <option value="continuous" data-i18n="sessionModeContinuous">Continuous</option>
+                <option value="topic" data-i18n="sessionModeTopic">Topic</option>
+              </select>
+            </label>
+            <label class="check">
+              <input name="sessions.topic_reply_in_thread" type="checkbox" />
+              <span data-i18n="topicReplyInThread">Use Feishu thread topics</span>
             </label>
             <label class="check">
               <input name="sessions.queue_while_running" type="checkbox" />
@@ -271,18 +289,11 @@
               <span data-i18n="statusInterval">Status Interval</span>
               <input name="reply.status_update_interval_sec" type="number" min="3" step="1" />
             </label>
-            <label class="wide">
-              <span data-i18n="commandOptions">Command Options</span>
-              <textarea name="commands.available" data-json="array" rows="4"></textarea>
-            </label>
-            <label class="wide">
-              <span data-i18n="skillOptions">Skill Options</span>
-              <textarea name="skills.available" data-json="array" rows="5"></textarea>
-            </label>
-            <label class="wide">
-              <span data-i18n="modelOptions">Model Options JSON</span>
-              <textarea name="models.available" data-json="array" rows="8"></textarea>
-            </label>
+            <div class="wide runtime-options-wrap">
+              <div id="detectedCommands" class="detected-options"></div>
+              <div id="detectedSkills" class="detected-options"></div>
+              <div id="detectedModels" class="detected-options"></div>
+            </div>
             <div class="wide access-editor-wrap">
               <div class="section-head compact">
                 <h3 data-i18n="accessDirectory">Access Directory</h3>
@@ -298,7 +309,9 @@
               <span data-i18n="presetTasksJson">Preset Tasks JSON</span>
               <textarea name="preset_tasks" data-json="object" rows="12"></textarea>
             </label>
-            <button type="submit" data-i18n="apply">Apply</button>
+            <div class="wide config-actions-bar">
+              <button type="submit" data-i18n="apply">Apply</button>
+            </div>
           </form>
           <p id="configMessage" class="message" role="status" aria-live="polite"></p>
         </div>

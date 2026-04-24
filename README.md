@@ -17,7 +17,7 @@ The project is designed to stay small and auditable:
 - Optional private-chat polling fallback for direct messages, disabled by default when event delivery is available.
 - Allowlisted users, chats, workspaces, and fixed commands.
 - Tiered access: trusted users can run free-form Codex jobs, limited users can only run approved preset tasks and commands.
-- Conversation continuity: private chats and group mentions can continue the same Codex session through `codex exec resume`.
+- Conversation continuity: continuous chat mode or topic mode can continue the same Codex session through `codex exec resume`.
 - Queueing: follow-up messages are queued while a job is running; replies to bridge job messages are treated as guidance for that conversation.
 - Optional editable status messages: the bridge can update the original status reply and replace it with `最终结论` when the job finishes, falling back to a new reply if Feishu message editing is unavailable.
 - Visual access directory: commands, skills, models, users, and groups can be edited from the dashboard.
@@ -71,6 +71,7 @@ Copy-Item .\bridge.config.example.json .\bridge.config.json
 Then edit:
 
 - `machine_id`
+- `codex.home_dir` (optional; empty means the default local `.codex` directory)
 - `log_dir`
 - `state_dir`
 - `workspaces`
@@ -82,15 +83,14 @@ Then edit:
 - `access.identities`
 - `access.user_groups`
 - `access.groups`
-- `commands.available`
-- `skills.available`
-- `models.available`
 - `models.default`
 - `models.fast`
 - `sessions`
 - `preset_tasks`
 
 `bridge.config.json` is ignored by git because it normally contains local paths, chat IDs, open IDs, and deployment choices.
+
+The bridge discovers local Codex capabilities from `codex.home_dir`: `config.toml`, `models_cache.json`, `skills/`, plugin skill caches, and `~\.agents\skills`. Static `commands.available`, `skills.available`, and `models.available` entries are still supported as manual additions in JSON config/API writes, but the dashboard treats runtime-discovered commands, skills, and models as read-only option chips instead of exposing raw text boxes.
 
 ## GitHub Maintenance
 
@@ -274,9 +274,9 @@ Model and skill options:
 /ask skills=feishu,lark-doc <prompt>
 ```
 
-When `sessions.enabled=true`, the bridge stores a conversation record per private chat and per group chat by default. After a job completes, the next private message or group mention resumes the same session. A reply to a bridge status/final message is attached to that job's conversation and is queued as guidance if the job is still running. Use `/cmd new-session` or `/ask --new` to start fresh.
+When `sessions.enabled=true`, the bridge stores conversation records and resumes completed Codex sessions through `codex exec resume`. `sessions.mode=continuous` keeps the existing behavior: one conversation per private chat or group chat scope, so normal follow-up messages stay in the current bridge conversation. A reply to a bridge status/final card is attached to that job's conversation and is queued as guidance if the job is still running.
 
-The default interaction model is continuous: normal follow-up messages stay in the current bridge conversation. During a running job, replying to its card is treated as additional guidance for that conversation, updates the same card, and is processed as a same-card continuation after the current run finishes. Sending a new chat message while a job is running creates a separate queued follow-up card. Use `/cmd new-session` when the next request should start from a clean context.
+`sessions.mode=topic` makes each triggering message start its own topic conversation. The bridge replies to the trigger with `--reply-in-thread` when `sessions.topic_reply_in_thread=true`, keeps the editable status card inside that topic, treats replies to a running card as guidance, treats new messages inside the same topic as queued follow-ups, and treats task triggers outside the topic as new conversations. Use `/cmd new-session` or `/ask --new` to reset the current topic's Codex session without changing the topic.
 
 When `reply.edit_status_message=true`, the bridge posts job status as an interactive Feishu card, then edits that same card as the job moves from queued to running to finished. The final edited card uses the `最终结论` label. If Feishu rejects card editing, the bridge logs the failure and sends a normal final text reply instead. User-facing cards use neutral wording such as `已收到消息`, `正在处理`, and `处理完成`.
 
@@ -305,7 +305,9 @@ Group chat can do the same when `public.treat_all_text_as_codex=true`; keep this
 
 ## Access Model
 
-The bridge uses an access directory instead of only raw ID lists. An identity can include memorable labels, aliases, names, emails, and one or more Feishu identifiers. Runtime authorization always matches explicit Feishu IDs from incoming events, normally `open_id`. If `access.resolve_contacts_enabled=true` and the current app has contact scopes, the bridge also resolves the sender's contact profile and can match configured `names`, `emails`, `mobiles`, and `aliases`. If contact resolution is unavailable, readable names and emails still help dashboard search but do not replace `open_ids`.
+The bridge uses an access directory instead of only raw ID lists. `label` is only a dashboard display label. Identity matching uses explicit Feishu IDs such as `open_ids` first, and can also use configured `names`, `emails`, `mobiles`, and `aliases` when the incoming event or resolved contact profile contains those values. If `access.resolve_contacts_enabled=true` and the current app has contact scopes, the bridge resolves the sender's contact profile before matching. If contact resolution is unavailable, readable names and emails still help dashboard search but do not replace `open_ids`.
+
+User-group and chat-group `members` values match identity keys such as `admin`, raw sender IDs such as `ou_xxx`, or everyone when empty or `"*"`. Chat groups are selected by `chat_ids`; any group aliases are only display/search metadata in the dashboard.
 
 ```json
 "access": {

@@ -25,6 +25,7 @@ import subprocess
 import sys
 import threading
 import time
+import tomllib
 import uuid
 from pathlib import Path
 from typing import Any
@@ -36,7 +37,7 @@ ROOT = Path(__file__).resolve().parent
 DASHBOARD_DIR = ROOT / "dashboard"
 ASSETS_DIR = ROOT / "assets"
 START_MENU_ICON = ASSETS_DIR / "feishu-codex-bridge.ico"
-CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+DEFAULT_CODEX_HOME = Path(os.path.expandvars(os.environ.get("CODEX_HOME") or str(Path.home() / ".codex"))).expanduser()
 DEFAULT_CONFIG = ROOT / "bridge.config.json"
 STARTUP_TASKS = {
     "dashboard": "FeishuCodexBridgeDashboard",
@@ -53,6 +54,7 @@ WINDOWS_INTEGRATION_ACTIONS = {
 }
 
 CONFIG_WRITE_ALLOWLIST = {
+    "codex.home_dir",
     "commands.available",
     "skills.available",
     "models.available",
@@ -65,11 +67,13 @@ CONFIG_WRITE_ALLOWLIST = {
     "models.fast.reasoning_effort",
     "models.fast.service_tier",
     "sessions.enabled",
+    "sessions.mode",
     "sessions.private_scope",
     "sessions.group_scope",
     "sessions.continue_after_completion",
     "sessions.queue_while_running",
     "sessions.reply_guidance_enabled",
+    "sessions.topic_reply_in_thread",
     "private.default_workspace",
     "private.codex_sandbox",
     "private.codex_timeout_sec",
@@ -192,6 +196,7 @@ class Bridge:
         self.config = self.load_config(config_path)
         self.dry_run = dry_run
         self.pid_name = pid_name
+        self.codex_home = self.resolve_codex_home()
         self.machine_id = str(self.config.get("machine_id") or os.environ.get("COMPUTERNAME") or "local-codex")
         self.log_dir = Path(self.config["log_dir"]).expanduser()
         self.state_dir = Path(self.config["state_dir"]).expanduser()
@@ -219,6 +224,13 @@ class Bridge:
             if not data.get(key):
                 raise ValueError(f"Config missing {key}")
         return data
+
+    def resolve_codex_home(self) -> Path:
+        cfg = self.config.get("codex", {}) if isinstance(self.config.get("codex"), dict) else {}
+        configured = str(cfg.get("home_dir") or cfg.get("config_dir") or "").strip()
+        if not configured:
+            return DEFAULT_CODEX_HOME.expanduser()
+        return Path(os.path.expandvars(configured)).expanduser()
 
     def write_pid(self, file_name: str = "bridge.pid") -> None:
         (self.state_dir / file_name).write_text(str(os.getpid()), encoding="ascii")
@@ -754,6 +766,7 @@ class Bridge:
 
     def env(self) -> dict[str, str]:
         env = os.environ.copy()
+        env["CODEX_HOME"] = str(self.codex_home)
         env.setdefault("LARK_CLI_NO_PROXY", "1")
         env.setdefault("PYTHONUTF8", "1")
         env.setdefault("PYTHONIOENCODING", "utf-8")
@@ -795,15 +808,30 @@ class Bridge:
             match = re.search(r'"message_id"\s*:\s*"([^"]+)"', output or "")
             return match.group(1) if match else ""
 
-    def reply_text(self, message_id: str, text: str, idempotency_key: str | None = None) -> str:
+    def reply_text(
+        self,
+        message_id: str,
+        text: str,
+        idempotency_key: str | None = None,
+        reply_in_thread: bool = False,
+    ) -> str:
         body = self.limit_reply(text)
         if self.dry_run:
-            self.log("info", "dry-run reply", message_id=message_id, text=body)
+            self.log("info", "dry-run reply", message_id=message_id, text=body, reply_in_thread=reply_in_thread)
             return ""
         args = ["im", "+messages-reply", "--as", "bot", "--message-id", message_id, "--text", body]
+        if reply_in_thread:
+            args.append("--reply-in-thread")
         if idempotency_key:
             args += ["--idempotency-key", idempotency_key[:64]]
-        output = self.run_lark(args, timeout=60)
+        try:
+            output = self.run_lark(args, timeout=60)
+        except Exception as exc:
+            if not reply_in_thread:
+                raise
+            self.log("warn", "thread reply failed; retrying as normal reply", message_id=message_id, error=str(exc))
+            fallback_args = [item for item in args if item != "--reply-in-thread"]
+            output = self.run_lark(fallback_args, timeout=60)
         return self.parse_lark_message_id(output)
 
     def send_text(self, chat_id: str, text: str, idempotency_key: str | None = None) -> str:
@@ -841,19 +869,37 @@ class Bridge:
         text: str,
         prefer_reply: bool,
         idempotency_key: str | None = None,
+        reply_in_thread: bool = False,
     ) -> str:
         body = self.limit_reply(text)
         card = self.status_card(title, body)
         if self.dry_run:
-            self.log("info", "dry-run card response", chat_id=chat_id, message_id=message_id, title=title, text=body)
+            self.log(
+                "info",
+                "dry-run card response",
+                chat_id=chat_id,
+                message_id=message_id,
+                title=title,
+                text=body,
+                reply_in_thread=reply_in_thread,
+            )
             return ""
         if prefer_reply and message_id:
             args = ["im", "+messages-reply", "--as", "bot", "--message-id", message_id, "--msg-type", "interactive", "--content", card]
+            if reply_in_thread:
+                args.append("--reply-in-thread")
         else:
             args = ["im", "+messages-send", "--as", "bot", "--chat-id", chat_id, "--msg-type", "interactive", "--content", card]
         if idempotency_key:
             args += ["--idempotency-key", idempotency_key[:64]]
-        output = self.run_lark(args, timeout=60)
+        try:
+            output = self.run_lark(args, timeout=60)
+        except Exception as exc:
+            if not (prefer_reply and message_id and reply_in_thread):
+                raise
+            self.log("warn", "thread card reply failed; retrying as normal reply", message_id=message_id, error=str(exc))
+            fallback_args = [item for item in args if item != "--reply-in-thread"]
+            output = self.run_lark(fallback_args, timeout=60)
         return self.parse_lark_message_id(output)
 
     def update_text_message(self, message_id: str, text: str) -> bool:
@@ -892,16 +938,33 @@ class Bridge:
             self.log("warn", "card update failed", message_id=message_id, error=str(exc))
             return False
 
-    def send_file(self, chat_id: str, message_id: str | None, path: Path, prefer_reply: bool, idempotency_key: str) -> None:
+    def send_file(
+        self,
+        chat_id: str,
+        message_id: str | None,
+        path: Path,
+        prefer_reply: bool,
+        idempotency_key: str,
+        reply_in_thread: bool = False,
+    ) -> None:
         if self.dry_run:
-            self.log("info", "dry-run send file", chat_id=chat_id, message_id=message_id, path=str(path))
+            self.log("info", "dry-run send file", chat_id=chat_id, message_id=message_id, path=str(path), reply_in_thread=reply_in_thread)
             return
         if prefer_reply and message_id:
             args = ["im", "+messages-reply", "--as", "bot", "--message-id", message_id, "--file", str(path)]
+            if reply_in_thread:
+                args.append("--reply-in-thread")
         else:
             args = ["im", "+messages-send", "--as", "bot", "--chat-id", chat_id, "--file", str(path)]
         args += ["--idempotency-key", idempotency_key[:64]]
-        self.run_lark(args, timeout=180)
+        try:
+            self.run_lark(args, timeout=180)
+        except Exception as exc:
+            if not (prefer_reply and message_id and reply_in_thread):
+                raise
+            self.log("warn", "thread file reply failed; retrying as normal reply", message_id=message_id, error=str(exc))
+            fallback_args = [item for item in args if item != "--reply-in-thread"]
+            self.run_lark(fallback_args, timeout=180)
 
     def send_response(
         self,
@@ -910,9 +973,10 @@ class Bridge:
         text: str,
         prefer_reply: bool,
         idempotency_key: str | None = None,
+        reply_in_thread: bool = False,
     ) -> str:
         if prefer_reply and message_id:
-            return self.reply_text(message_id, text, idempotency_key=idempotency_key)
+            return self.reply_text(message_id, text, idempotency_key=idempotency_key, reply_in_thread=reply_in_thread)
         return self.send_text(chat_id, text, idempotency_key=idempotency_key)
 
     def send_job_start_response(
@@ -923,10 +987,26 @@ class Bridge:
         idempotency_key: str,
     ) -> str:
         message = str(result.get("message") or "")
+        reply_in_thread = bool(result.get("reply_in_thread"))
         if result.get("ok") and self.config.get("reply", {}).get("edit_status_message", False):
             title = str(result.get("title") or "已收到消息")
-            return self.send_card_response(msg["chat_id"], msg["message_id"], title, message, prefer_reply, idempotency_key=idempotency_key)
-        return self.send_response(msg["chat_id"], msg["message_id"], message, prefer_reply, idempotency_key=idempotency_key)
+            return self.send_card_response(
+                msg["chat_id"],
+                msg["message_id"],
+                title,
+                message,
+                prefer_reply,
+                idempotency_key=idempotency_key,
+                reply_in_thread=reply_in_thread,
+            )
+        return self.send_response(
+            msg["chat_id"],
+            msg["message_id"],
+            message,
+            prefer_reply,
+            idempotency_key=idempotency_key,
+            reply_in_thread=reply_in_thread,
+        )
 
     def fetch_reply_to(self, message_id: str) -> str:
         if not message_id or self.dry_run:
@@ -1084,17 +1164,10 @@ class Bridge:
             or sender_obj.get("nickname")
             or ""
         )
-        reply_to = (
-            raw.get("reply_to")
-            or raw.get("parent_id")
-            or raw.get("root_id")
-            or raw.get("thread_id")
-            or raw.get("message", {}).get("reply_to")
-            or raw.get("message", {}).get("parent_id")
-            or raw.get("message", {}).get("root_id")
-            or raw.get("message", {}).get("thread_id")
-            or ""
-        )
+        parent_id = str(raw.get("parent_id") or raw.get("message", {}).get("parent_id") or "")
+        root_id = str(raw.get("root_id") or raw.get("message", {}).get("root_id") or "")
+        thread_id = str(raw.get("thread_id") or raw.get("message", {}).get("thread_id") or "")
+        reply_to = str(raw.get("reply_to") or raw.get("message", {}).get("reply_to") or parent_id or root_id or thread_id or "")
         return {
             "message_id": message_id,
             "chat_id": chat_id,
@@ -1109,6 +1182,9 @@ class Bridge:
             "msg_type": msg_type,
             "content": content,
             "reply_to": str(reply_to),
+            "parent_id": parent_id,
+            "root_id": root_id,
+            "thread_id": thread_id,
             "mentions": raw.get("mentions") or raw.get("message", {}).get("mentions") or [],
             "text": self.extract_text(msg_type, content).strip(),
             "raw": raw,
@@ -1550,6 +1626,8 @@ class Bridge:
             "machine_id": self.machine_id,
             "version": self.config.get("protocol_version", "2"),
             "codex_cli": self.codex_cli,
+            "codex_home": str(self.codex_home),
+            "codex_config": str(self.codex_home / "config.toml"),
             "lark_cli": self.lark_cli,
             "workspaces": sorted((self.config.get("workspaces") or {}).keys()),
             "commands": command_options,
@@ -1586,43 +1664,175 @@ class Bridge:
         )
         return sorted(commands)
 
+    @staticmethod
+    def skill_name_from_file(path: Path) -> str:
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except Exception:
+            return path.parent.name
+        if lines and lines[0].strip() == "---":
+            for line in lines[1:80]:
+                if line.strip() == "---":
+                    break
+                match = re.match(r"\s*name\s*:\s*(.+?)\s*$", line)
+                if match:
+                    return match.group(1).strip().strip("'\"") or path.parent.name
+        return path.parent.name
+
+    def discover_skills_dir(self, root: Path, prefix: str = "") -> list[str]:
+        if not root.exists():
+            return []
+        result: list[str] = []
+        for path in root.rglob("SKILL.md"):
+            name = self.skill_name_from_file(path)
+            value = f"{prefix}:{name}" if prefix and not name.startswith(f"{prefix}:") else name
+            if value and value not in result:
+                result.append(value)
+        return result
+
+    def discover_plugin_skills(self) -> list[str]:
+        plugins_cache = self.codex_home / "plugins" / "cache"
+        if not plugins_cache.exists():
+            return []
+        result: list[str] = []
+        for plugin_json in plugins_cache.rglob(".codex-plugin/plugin.json"):
+            try:
+                plugin = json.loads(plugin_json.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            plugin_name = str(plugin.get("name") or "").strip()
+            skills_rel = str(plugin.get("skills") or "./skills/")
+            skills_dir = (plugin_json.parent.parent / skills_rel).resolve()
+            for name in self.discover_skills_dir(skills_dir, plugin_name):
+                if name not in result:
+                    result.append(name)
+        return result
+
+    def discover_codex_skills(self) -> list[str]:
+        return self.merge_unique(
+            self.discover_skills_dir(self.codex_home / "skills"),
+            self.discover_skills_dir(Path.home() / ".agents" / "skills"),
+            self.discover_plugin_skills(),
+        )
+
     def available_skills(self) -> list[str]:
         skills_cfg = self.config.get("skills", {})
-        if isinstance(skills_cfg, dict) and isinstance(skills_cfg.get("available"), list):
-            return [str(item) for item in skills_cfg.get("available", [])]
-        return [str(item) for item in self.config.get("capabilities", {}).get("skills", []) or []]
+        configured = skills_cfg.get("available", []) if isinstance(skills_cfg, dict) and isinstance(skills_cfg.get("available"), list) else []
+        return self.merge_unique(
+            configured,
+            self.discover_codex_skills(),
+            self.config.get("capabilities", {}).get("skills", []) or [],
+        )
+
+    @staticmethod
+    def normalize_model_entries(models: Any) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for item in models or []:
+            if isinstance(item, dict):
+                model_id = str(item.get("id") or item.get("model") or item.get("name") or item.get("slug") or "").strip()
+                if model_id:
+                    entry = dict(item)
+                    entry["id"] = model_id
+                    result.append(entry)
+            else:
+                model_id = str(item).strip()
+                if model_id:
+                    result.append({"id": model_id, "label": model_id})
+        return result
+
+    @staticmethod
+    def merge_model_entries(*groups: Any) -> list[dict[str, Any]]:
+        order: list[str] = []
+        merged: dict[str, dict[str, Any]] = {}
+        for group in groups:
+            for entry in Bridge.normalize_model_entries(group):
+                model_id = str(entry.get("id") or "").strip()
+                if not model_id:
+                    continue
+                if model_id not in merged:
+                    merged[model_id] = dict(entry)
+                    order.append(model_id)
+                    continue
+                current = merged[model_id]
+                for key, value in entry.items():
+                    if value not in (None, "", []) and current.get(key) in (None, "", []):
+                        current[key] = value
+        return [merged[model_id] for model_id in order]
+
+    def local_codex_config(self) -> dict[str, Any]:
+        path = self.codex_home / "config.toml"
+        if not path.exists():
+            return {}
+        try:
+            with path.open("rb") as f:
+                data = tomllib.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def local_codex_model_profile(self) -> dict[str, str]:
+        config = self.local_codex_config()
+        return {
+            "model": str(config.get("model") or ""),
+            "reasoning_effort": str(config.get("model_reasoning_effort") or config.get("reasoning_effort") or ""),
+            "service_tier": str(config.get("service_tier") or ""),
+        }
+
+    def discover_codex_models(self) -> list[dict[str, Any]]:
+        result: list[tuple[int, str, dict[str, Any]]] = []
+        cache_path = self.codex_home / "models_cache.json"
+        if cache_path.exists():
+            try:
+                parsed = json.loads(cache_path.read_text(encoding="utf-8"))
+            except Exception:
+                parsed = {}
+            for item in (parsed.get("models", []) if isinstance(parsed, dict) else []):
+                if not isinstance(item, dict) or item.get("visibility") == "hide":
+                    continue
+                model_id = str(item.get("slug") or item.get("id") or item.get("model") or item.get("name") or "").strip()
+                if not model_id:
+                    continue
+                efforts = []
+                for effort in item.get("supported_reasoning_levels", []) or []:
+                    if isinstance(effort, dict):
+                        value = str(effort.get("effort") or "").strip()
+                    else:
+                        value = str(effort).strip()
+                    if value:
+                        efforts.append(value)
+                entry: dict[str, Any] = {
+                    "id": model_id,
+                    "label": str(item.get("display_name") or model_id),
+                }
+                if efforts:
+                    entry["reasoning_efforts"] = efforts
+                if item.get("default_reasoning_level"):
+                    entry["default_reasoning_effort"] = str(item.get("default_reasoning_level"))
+                if item.get("additional_speed_tiers"):
+                    entry["speed_tiers"] = item.get("additional_speed_tiers")
+                priority = int(item.get("priority") if isinstance(item.get("priority"), int) else 999)
+                result.append((priority, model_id, entry))
+        local_profile = self.local_codex_model_profile()
+        if local_profile.get("model"):
+            result.append((-1000, local_profile["model"], {"id": local_profile["model"], "label": local_profile["model"]}))
+        private_model = str(self.config.get("private", {}).get("codex_model") or "").strip()
+        if private_model:
+            result.append((-999, private_model, {"id": private_model, "label": private_model}))
+        return [entry for _, _, entry in sorted(result, key=lambda item: (item[0], item[1]))]
 
     def available_models(self) -> list[dict[str, Any]]:
         models_cfg = self.config.get("models", {})
         models = models_cfg.get("available", []) if isinstance(models_cfg, dict) else []
-        if isinstance(models, list) and models:
-            result = []
-            for item in models:
-                if isinstance(item, dict):
-                    model_id = str(item.get("id") or item.get("model") or item.get("name") or "").strip()
-                    if model_id:
-                        entry = dict(item)
-                        entry["id"] = model_id
-                        result.append(entry)
-                elif str(item).strip():
-                    result.append({"id": str(item).strip(), "label": str(item).strip()})
-            return result
-        private_model = str(self.config.get("private", {}).get("codex_model") or "").strip()
-        return [{"id": private_model, "label": private_model}] if private_model else []
+        return self.merge_model_entries(self.discover_codex_models(), models)
 
     def model_profile(self, name: str = "default") -> dict[str, str]:
         models_cfg = self.config.get("models", {}) if isinstance(self.config.get("models", {}), dict) else {}
         profile = models_cfg.get(name, {}) if isinstance(models_cfg.get(name, {}), dict) else {}
-        if not profile and name == "default":
-            profile = {
-                "model": self.config.get("private", {}).get("codex_model", ""),
-                "reasoning_effort": "",
-                "service_tier": "",
-            }
+        local_profile = self.local_codex_model_profile() if name == "default" else {}
         return {
-            "model": str(profile.get("model") or ""),
-            "reasoning_effort": str(profile.get("reasoning_effort") or ""),
-            "service_tier": str(profile.get("service_tier") or ""),
+            "model": str(profile.get("model") or local_profile.get("model") or self.config.get("private", {}).get("codex_model", "")),
+            "reasoning_effort": str(profile.get("reasoning_effort") or local_profile.get("reasoning_effort") or ""),
+            "service_tier": str(profile.get("service_tier") or local_profile.get("service_tier") or ""),
         }
 
     def configured_event_types(self) -> list[str]:
@@ -1790,9 +2000,71 @@ class Bridge:
     def sessions_enabled(self) -> bool:
         return bool(self.config.get("sessions", {}).get("enabled", True))
 
+    def session_mode(self) -> str:
+        mode = str((self.config.get("sessions", {}) or {}).get("mode") or "continuous").strip().lower()
+        if mode in ("topic", "thread", "topics", "threads", "话题"):
+            return "topic"
+        return "continuous"
+
+    def topic_mode_enabled(self) -> bool:
+        return self.sessions_enabled() and self.session_mode() == "topic"
+
+    def topic_reply_in_thread_enabled(self) -> bool:
+        sessions = self.config.get("sessions", {}) or {}
+        return bool(sessions.get("topic_reply_in_thread", True))
+
+    def topic_ids_for_msg(self, msg: dict[str, Any]) -> list[str]:
+        if not self.topic_mode_enabled():
+            return []
+        ids = self.merge_unique(
+            [msg.get("thread_id")],
+            [msg.get("root_id")],
+            [msg.get("parent_id")],
+            [msg.get("reply_to")],
+            [msg.get("message_id")],
+        )
+        return ids
+
+    def find_conversation_key_by_topic_ids(self, chat_id: str, topic_ids: list[str]) -> str:
+        if not chat_id or not topic_ids:
+            return ""
+        wanted = set(map(str, topic_ids))
+        matches: list[tuple[str, dict[str, Any]]] = []
+        for key, item in self.read_conversations().items():
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("chat_id") or "") != str(chat_id):
+                continue
+            known_ids = set(map(str, item.get("topic_ids") or []))
+            if wanted.intersection(known_ids):
+                matches.append((key, item))
+        if not matches:
+            return ""
+        matches.sort(key=lambda pair: str(pair[1].get("updated_at", "")), reverse=True)
+        return str(matches[0][0])
+
+    def topic_conversation_key_for_msg(self, msg: dict[str, Any]) -> str:
+        topic_ids = self.topic_ids_for_msg(msg)
+        existing = self.find_conversation_key_by_topic_ids(str(msg.get("chat_id") or ""), topic_ids)
+        if existing:
+            return existing
+        topic_id = topic_ids[0] if topic_ids else str(msg.get("message_id") or uuid.uuid4().hex)
+        prefix = "p2p" if msg.get("chat_type") == "p2p" else "group"
+        return f"{prefix}:{msg.get('chat_id')}:topic:{topic_id}"
+
+    def should_reply_in_thread(self, msg: dict[str, Any], prefer_reply: bool) -> bool:
+        return bool(
+            prefer_reply
+            and msg.get("message_id")
+            and self.topic_mode_enabled()
+            and self.topic_reply_in_thread_enabled()
+        )
+
     def conversation_key_for_msg(self, msg: dict[str, Any], reply_job: dict[str, Any] | None = None) -> str:
         if reply_job and reply_job.get("conversation_key"):
             return str(reply_job["conversation_key"])
+        if self.topic_mode_enabled():
+            return self.topic_conversation_key_for_msg(msg)
         sessions = self.config.get("sessions", {}) or {}
         if msg.get("chat_type") == "p2p":
             scope = str(sessions.get("private_scope") or "chat")
@@ -1812,7 +2084,10 @@ class Bridge:
             return
         data = self.read_conversations()
         current = data.get(key, {}) if isinstance(data.get(key), dict) else {}
+        topic_ids = updates.pop("topic_ids", None)
         current.update({name: value for name, value in updates.items() if value is not None})
+        if topic_ids is not None:
+            current["topic_ids"] = self.merge_unique(current.get("topic_ids", []), topic_ids)
         current["updated_at"] = utcnow()
         data[key] = current
         self.write_conversations(data)
@@ -1834,9 +2109,11 @@ class Bridge:
         current_key = self.conversation_key_for_msg(msg) if msg else ""
         for key, item in sorted(data.items(), key=lambda pair: str(pair[1].get("updated_at", "")), reverse=True)[:12]:
             marker = "*" if key == current_key else "-"
+            topic_ids = ",".join(str(value) for value in (item.get("topic_ids") or [])[:3])
             lines.append(
                 f"{marker} {key} session={item.get('session_id') or ''} "
-                f"last_job={item.get('last_job_id') or ''} updated={item.get('updated_at') or ''}"
+                f"last_job={item.get('last_job_id') or ''} mode={item.get('mode') or 'continuous'} "
+                f"topics={topic_ids} updated={item.get('updated_at') or ''}"
             )
         return "\n".join(lines)
 
@@ -1905,6 +2182,7 @@ class Bridge:
             "status": "ok",
             "now": utcnow(),
             "config_path": str(self.config_path),
+            "codex_home": str(self.codex_home),
             "log_dir": str(self.log_dir),
             "state_dir": str(self.state_dir),
             "pid": os.getpid(),
@@ -1950,6 +2228,10 @@ class Bridge:
     def editable_config(self) -> dict[str, Any]:
         return {
             "config": self.config,
+            "runtime": {
+                "codex_home": str(self.codex_home),
+                "default_codex_home": str(DEFAULT_CODEX_HOME.expanduser()),
+            },
             "allow_config_write": bool(self.config.get("dashboard", {}).get("allow_config_write", False)),
             "write_allowlist": sorted(CONFIG_WRITE_ALLOWLIST),
         }
@@ -1977,6 +2259,18 @@ class Bridge:
 
     def coerce_config_value(self, key: str, value: Any) -> Any:
         old = self.get_dotted(self.config, key)
+        def as_bool(candidate: Any) -> bool:
+            if isinstance(candidate, str):
+                return candidate.strip().lower() in ("1", "true", "yes", "on")
+            return bool(candidate)
+
+        if key == "sessions.mode":
+            mode = str(value or "continuous").strip().lower()
+            if mode not in ("continuous", "topic"):
+                raise ValueError("sessions.mode must be continuous or topic")
+            return mode
+        if key == "sessions.topic_reply_in_thread":
+            return as_bool(value)
         if key in ("workspaces", "preset_tasks", "access.default_policy", "access.identities", "access.user_groups", "access.groups", "models.default", "models.fast"):
             if not isinstance(value, dict):
                 raise ValueError(f"{key} must be a JSON object")
@@ -1986,7 +2280,7 @@ class Bridge:
                 raise ValueError(f"{key} must be a JSON array")
             return value
         if isinstance(old, bool):
-            return bool(value)
+            return as_bool(value)
         if isinstance(old, int) and not isinstance(old, bool):
             return int(value)
         if isinstance(old, list):
@@ -2025,11 +2319,12 @@ class Bridge:
         backup.write_text(json.dumps(self.config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.config_path.write_text(json.dumps(new_config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.config = new_config
+        self.codex_home = self.resolve_codex_home()
         self.machine_id = str(self.config.get("machine_id") or self.machine_id)
         self.log("info", "dashboard updated config", changed=changed, backup=str(backup))
         restart_recommended = any(
             key.startswith(("health_server.", "dashboard.", "private.poll_interval_sec", "private.polling_fallback_enabled"))
-            or key == "event_types"
+            or key in ("event_types", "codex.home_dir")
             for key in changed
         )
         return {"changed": changed, "backup": str(backup), "restart_recommended": restart_recommended}
@@ -2089,11 +2384,13 @@ class Bridge:
                 options[key] = model_profile.get(key, "")
         return {"workspace": workspace, "cwd": cwd, "prompt": prompt, "options": options}
 
-    def can_start_job(self) -> tuple[bool, str]:
+    def can_start_job(self, conversation_key: str | None = None) -> tuple[bool, str]:
         max_jobs = int(self.config.get("jobs", {}).get("max_concurrent", 1))
-        active = [j for j in self.read_jobs() if j.get("status") == "running"]
+        active = [j for j in self.read_jobs() if j.get("status") == "running" or (j.get("status") == "queued" and j.get("worker_pid"))]
         if len(active) >= max_jobs:
             return False, f"Bridge is busy: {len(active)}/{max_jobs} active jobs. Use /cmd status."
+        if self.sessions_enabled() and conversation_key and any(str(j.get("conversation_key") or "") == conversation_key for j in active):
+            return False, "This conversation already has a running job. The follow-up will stay queued."
         return True, ""
 
     def save_job(self, job: dict[str, Any]) -> Path:
@@ -2194,7 +2491,14 @@ class Bridge:
             queued = sorted(self.queued_jobs(), key=lambda item: str(item.get("created_at", "")))
             if not queued:
                 return started
-            job = queued[0]
+            job = None
+            for candidate in queued:
+                can_start, _ = self.can_start_job(conversation_key=str(candidate.get("conversation_key") or ""))
+                if can_start:
+                    job = candidate
+                    break
+            if job is None:
+                return started
             conversation = self.conversation_for_key(str(job.get("conversation_key") or ""))
             if self.sessions_enabled() and not job.get("new_session") and conversation.get("session_id"):
                 job["resume_session_id"] = str(conversation.get("session_id") or "")
@@ -2217,8 +2521,12 @@ class Bridge:
         try:
             job = json.loads(path.read_text(encoding="utf-8"))
             job["status_message_id"] = message_id
+            if job.get("conversation_mode") == "topic":
+                job["topic_ids"] = self.merge_unique(job.get("topic_ids", []), [message_id])
             self.save_job(job)
             self.append_job_event(job_id, "status_message_attached", message_id=message_id)
+            if job.get("conversation_mode") == "topic":
+                self.update_conversation(str(job.get("conversation_key") or ""), topic_ids=[message_id])
             if job.get("status") in ("queued", "running"):
                 self.update_job_status_message(job, str(job.get("status") or "queued"))
         except Exception as exc:
@@ -2326,6 +2634,9 @@ class Bridge:
         new_session = bool(options.get("new_session"))
         conversation_key = self.conversation_key_for_msg(msg, reply_job=reply_job)
         conversation = self.conversation_for_key(conversation_key)
+        conversation_mode = self.session_mode()
+        topic_ids = self.topic_ids_for_msg(msg)
+        reply_in_thread = self.should_reply_in_thread(msg, prefer_reply)
         queue_kind = "new"
         if reply_job:
             queue_kind = "guidance" if reply_job.get("status") in ("queued", "running") else "followup"
@@ -2357,6 +2668,8 @@ class Bridge:
             "codex_options": options,
             "selected_skills": selected_skills or [],
             "conversation_key": conversation_key,
+            "conversation_mode": conversation_mode,
+            "topic_ids": topic_ids,
             "queue_kind": queue_kind,
             "parent_job_id": reply_job.get("job_id") if reply_job else "",
             "new_session": new_session,
@@ -2370,8 +2683,12 @@ class Bridge:
                 "sender_id": msg["sender_id"],
                 "message_id": msg["message_id"],
                 "reply_to": msg.get("reply_to", ""),
+                "parent_id": msg.get("parent_id", ""),
+                "root_id": msg.get("root_id", ""),
+                "thread_id": msg.get("thread_id", ""),
                 "msg_type": msg["msg_type"],
                 "prefer_reply": prefer_reply,
+                "reply_in_thread": reply_in_thread,
             },
             "attachments": attachments,
             "output_file": str(job_dir / "last-message.txt"),
@@ -2389,6 +2706,8 @@ class Bridge:
             sender_id=msg["sender_id"],
             workspace=workspace,
             last_job_id=job_id,
+            mode=conversation_mode,
+            topic_ids=topic_ids,
         )
         self.append_job_event(
             job_id,
@@ -2400,9 +2719,16 @@ class Bridge:
         )
         if self.dry_run:
             message = self.format_job_start_message(job, queue_position=1, dry_run=True)
-            return {"ok": True, "job_id": job_id, "title": "已收到消息", "message": message, "conversation_key": conversation_key}
+            return {
+                "ok": True,
+                "job_id": job_id,
+                "title": "已收到消息",
+                "message": message,
+                "conversation_key": conversation_key,
+                "reply_in_thread": reply_in_thread,
+            }
         if not self.config.get("sessions", {}).get("queue_while_running", True):
-            ok, why = self.can_start_job()
+            ok, why = self.can_start_job(conversation_key=conversation_key)
             if not ok:
                 return {"ok": False, "message": why}
         self.schedule_queued_jobs()
@@ -2410,7 +2736,14 @@ class Bridge:
         job["queue_position"] = queue_position
         self.save_job(job)
         message = self.format_job_start_message(job, queue_position=queue_position)
-        return {"ok": True, "job_id": job_id, "title": "已收到消息", "message": message, "conversation_key": conversation_key}
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "title": "已收到消息",
+            "message": message,
+            "conversation_key": conversation_key,
+            "reply_in_thread": reply_in_thread,
+        }
 
     def build_codex_prompt(self, job: dict[str, Any]) -> str:
         constraints = self.config.get("codex_guardrails", [])
@@ -2425,8 +2758,11 @@ class Bridge:
             f"- source_message_id: {job.get('source', {}).get('message_id')}",
             f"- workspace: {job.get('workspace')}",
             f"- conversation_key: {job.get('conversation_key') or ''}",
+            f"- conversation_mode: {job.get('conversation_mode') or self.session_mode()}",
             f"- queue_kind: {job.get('queue_kind') or 'new'}",
         ]
+        if job.get("topic_ids"):
+            lines.append(f"- topic_ids: {', '.join(str(item) for item in job.get('topic_ids') or [])}")
         if job.get("resume_session_id"):
             lines.append(f"- resumed_codex_session_id: {job.get('resume_session_id')}")
         selected_skills = [str(item) for item in job.get("selected_skills", []) or []]
@@ -2499,7 +2835,10 @@ class Bridge:
         else:
             lines = ["已收到消息，正在开始处理。"]
         lines.append("处理完成后会在这条消息里更新最终结论。")
-        lines.append("继续发送消息会沿用本会话；发送 /cmd new-session 可新开会话。")
+        if str(job.get("conversation_mode") or self.session_mode()) == "topic":
+            lines.append("在这个话题里继续发送消息会沿用本会话；在话题外触发任务会新开任务。")
+        else:
+            lines.append("继续发送消息会沿用本会话；发送 /cmd new-session 可新开会话。")
         if dry_run:
             lines.append("当前是 dry-run，不会实际执行。")
         if self.job_details_allowed(job):
@@ -2563,7 +2902,10 @@ class Bridge:
             lines.append(elapsed)
         if result:
             lines.extend(["", "最终结论:", result.strip()])
-            lines.extend(["", "继续发送消息会沿用本会话；发送 /cmd new-session 可新开会话。"])
+            if str(job.get("conversation_mode") or self.session_mode()) == "topic":
+                lines.extend(["", "在这个话题里继续发送消息会沿用本会话；在话题外触发任务会新开任务。"])
+            else:
+                lines.extend(["", "继续发送消息会沿用本会话；发送 /cmd new-session 可新开会话。"])
         elif phase in ("running", "queued"):
             lines.extend(["", "处理完成后会在这里更新最终结论。"])
             progress = self.progress_summary_for_job(job)
@@ -2855,6 +3197,7 @@ class Bridge:
         chat_id = str(source.get("chat_id") or "")
         message_id = str(source.get("message_id") or "")
         prefer_reply = bool(source.get("prefer_reply"))
+        reply_in_thread = bool(source.get("reply_in_thread"))
         status = job.get("status")
         status_text = {"completed": "处理完成。", "failed": "处理失败。", "timed_out": "处理超时。"}.get(str(status), f"状态：{status}")
         if self.job_details_allowed(job):
@@ -2868,10 +3211,19 @@ class Bridge:
         edited = self.update_job_status_message(job, str(status), result=result)
         sent_id = ""
         if not edited:
-            sent_id = self.send_response(chat_id, message_id, body, prefer_reply=prefer_reply, idempotency_key=key)
+            sent_id = self.send_response(
+                chat_id,
+                message_id,
+                body,
+                prefer_reply=prefer_reply,
+                idempotency_key=key,
+                reply_in_thread=reply_in_thread,
+            )
         final_message_id = sent_id or str(job.get("status_message_id") or "")
         if final_message_id:
             job["final_message_id"] = final_message_id
+            if job.get("conversation_mode") == "topic":
+                job["topic_ids"] = self.merge_unique(job.get("topic_ids", []), [final_message_id])
             self.save_job(job)
         if status == "completed":
             session_id = ""
@@ -2889,6 +3241,7 @@ class Bridge:
                 last_job_id=job.get("job_id"),
                 last_status=status,
                 last_message_id=final_message_id or message_id,
+                topic_ids=job.get("topic_ids", []),
             )
         reply_cfg = self.config.get("reply", {})
         output_file = Path(str(job.get("output_file") or ""))
@@ -2898,7 +3251,14 @@ class Bridge:
             and len((result or "")) > int(reply_cfg.get("max_chars", 3500))
         ):
             try:
-                self.send_file(chat_id, message_id, output_file, prefer_reply, idempotency_key=key + "-file")
+                self.send_file(
+                    chat_id,
+                    message_id,
+                    output_file,
+                    prefer_reply,
+                    idempotency_key=key + "-file",
+                    reply_in_thread=reply_in_thread,
+                )
             except Exception as exc:
                 self.log("error", "failed to upload full output file", job_id=job["job_id"], error=str(exc))
 
@@ -2910,7 +3270,7 @@ class Bridge:
     def session_path_for_id(self, session_id: str) -> str:
         if not session_id:
             return ""
-        sessions = CODEX_HOME / "sessions"
+        sessions = self.codex_home / "sessions"
         if not sessions.exists():
             return ""
         pattern = str(sessions / "**" / f"*{session_id}*.jsonl")
@@ -2928,7 +3288,7 @@ class Bridge:
         return self.find_codex_session(start_time)
 
     def find_codex_session(self, start_time: float) -> tuple[str, str]:
-        sessions = CODEX_HOME / "sessions"
+        sessions = self.codex_home / "sessions"
         if not sessions.exists():
             return "", ""
         candidates = []

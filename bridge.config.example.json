@@ -1,6 +1,9 @@
 {
   "protocol_version": "2",
   "machine_id": "my-codex-machine",
+  "codex": {
+    "home_dir": ""
+  },
   "log_dir": "C:\\Users\\YOUR_USER\\.codex\\logs\\feishu-codex-bridge",
   "state_dir": "C:\\Users\\YOUR_USER\\.codex\\tmp\\feishu-codex-bridge",
   "workspaces": {
@@ -324,11 +327,13 @@
   },
   "sessions": {
     "enabled": true,
+    "mode": "continuous",
     "private_scope": "chat",
     "group_scope": "chat",
     "continue_after_completion": true,
     "queue_while_running": true,
-    "reply_guidance_enabled": true
+    "reply_guidance_enabled": true,
+    "topic_reply_in_thread": true
   },
   "multimodal": {
     "download_incoming": true,
