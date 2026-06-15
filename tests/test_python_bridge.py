@@ -399,7 +399,7 @@ class PythonBridgeNormalizationTest(unittest.TestCase):
         bridge = bare_bridge()
         bridge.require_shell_integration = lambda client_address: None
         bridge.create_startup_task_admin = lambda kind: {"installed": True, "kind": kind}
-        bridge.windows_integration_status = lambda: {"supported": True}
+        bridge.windows_integration_status = lambda force_refresh=False: {"supported": True}
 
         result = bridge.apply_windows_integration_action("enable-connection-startup-admin", "127.0.0.1")
 
@@ -422,6 +422,25 @@ class PythonBridgeNormalizationTest(unittest.TestCase):
         self.assertEqual("disabled", status["startup"]["connection"]["state"])
         bridge.start_menu_status.assert_not_called()
         bridge.startup_status.assert_not_called()
+
+    def test_windows_integration_status_is_cached_for_dashboard_refreshes(self) -> None:
+        bridge = bare_bridge()
+        bridge.config = {"dashboard": {"allow_shell_integration": True}}
+        bridge.windows_integration_supported = lambda: True
+        bridge.start_menu_status = mock.Mock(return_value={"installed": True, "partial": False, "status": "installed"})
+        bridge.startup_status = mock.Mock(return_value={"installed": False, "exists": False, "enabled": False})
+
+        first = bridge.windows_integration_status()
+        second = bridge.windows_integration_status()
+
+        self.assertIs(first, second)
+        bridge.start_menu_status.assert_called_once()
+        self.assertEqual(2, bridge.startup_status.call_count)
+
+        bridge.windows_integration_status(force_refresh=True)
+
+        self.assertEqual(2, bridge.start_menu_status.call_count)
+        self.assertEqual(4, bridge.startup_status.call_count)
 
     def test_create_startup_task_falls_back_to_startup_shortcut(self) -> None:
         bridge = bare_bridge()

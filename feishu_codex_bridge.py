@@ -49,6 +49,7 @@ STARTUP_TASKS = {
     "dashboard": "FeishuCodexBridgeDashboard",
     "connection": "FeishuCodexBridgeConnection",
 }
+WINDOWS_INTEGRATION_STATUS_CACHE_SEC = 60.0
 WINDOWS_INTEGRATION_ACTIONS = {
     "status",
     "install-start-menu",
@@ -275,6 +276,8 @@ class Bridge:
         self.stop_event = threading.Event()
         self.pending_private_forward_messages: dict[str, dict[str, Any]] = {}
         self.pending_private_forward_lock = threading.Lock()
+        self._windows_integration_status_cache: tuple[float, dict[str, Any]] | None = None
+        self._windows_integration_status_lock = threading.Lock()
         self.lark_cli_args = resolve_lark_cli_args()
         self.lark_cli = self.lark_cli_args[0]
         self.codex_cli = resolve_command("codex")
@@ -1278,7 +1281,19 @@ sys.exit(1)
         self.log("info", "removed Start Menu shortcuts", removed=removed)
         return {"installed": False, "folder": str(folder), "removed": removed}
 
-    def windows_integration_status(self) -> dict[str, Any]:
+    def windows_integration_status_lock(self) -> threading.Lock:
+        lock = getattr(self, "_windows_integration_status_lock", None)
+        if lock is None:
+            lock = threading.Lock()
+            self._windows_integration_status_lock = lock
+            self._windows_integration_status_cache = None
+        return lock
+
+    def invalidate_windows_integration_status_cache(self) -> None:
+        with self.windows_integration_status_lock():
+            self._windows_integration_status_cache = None
+
+    def windows_integration_status_uncached(self) -> dict[str, Any]:
         supported = self.windows_integration_supported()
         control_enabled = self.shell_integration_enabled()
         if not control_enabled:
@@ -1316,12 +1331,28 @@ sys.exit(1)
             "startup": startup,
         }
 
+    def windows_integration_status(self, force_refresh: bool = False) -> dict[str, Any]:
+        if force_refresh:
+            self.invalidate_windows_integration_status_cache()
+        now = time.monotonic()
+        with self.windows_integration_status_lock():
+            cached_entry = getattr(self, "_windows_integration_status_cache", None)
+            if cached_entry:
+                created_at, cached = cached_entry
+                if now - created_at < WINDOWS_INTEGRATION_STATUS_CACHE_SEC:
+                    return cached
+        status = self.windows_integration_status_uncached()
+        with self.windows_integration_status_lock():
+            self._windows_integration_status_cache = (time.monotonic(), status)
+        return status
+
     def apply_windows_integration_action(self, action: str, client_address: str) -> dict[str, Any]:
         if action not in WINDOWS_INTEGRATION_ACTIONS:
             raise ValueError(f"Unknown Windows integration action: {action}")
         if action == "status":
-            return self.windows_integration_status()
+            return self.windows_integration_status(force_refresh=True)
         self.require_shell_integration(client_address)
+        self.invalidate_windows_integration_status_cache()
         if action == "install-start-menu":
             result = self.install_start_menu()
         elif action == "remove-start-menu":
@@ -1340,7 +1371,7 @@ sys.exit(1)
             result = self.delete_startup_task("connection")
         else:
             raise ValueError(f"Unknown Windows integration action: {action}")
-        return {"action": action, "result": result, "status": self.windows_integration_status()}
+        return {"action": action, "result": result, "status": self.windows_integration_status(force_refresh=True)}
 
     def log(self, level: str, message: str, **data: Any) -> None:
         entry = {
