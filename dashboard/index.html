@@ -62,6 +62,8 @@
           <div class="connection-actions">
             <button id="startConnectionBtn" type="button" data-i18n="startConnection">Start Connection</button>
             <button id="stopConnectionBtn" class="secondary danger" type="button" data-i18n="stopConnection">Stop Connection</button>
+            <button id="restartDashboardBtn" class="secondary" type="button" data-i18n="restartDashboard">Restart Dashboard</button>
+            <button id="restartAllBtn" class="secondary" type="button" data-i18n="restartAll">Restart All</button>
           </div>
         </div>
         <p id="connectionMessage" class="message" role="status" aria-live="polite"></p>
@@ -90,9 +92,11 @@
             <div>
               <span data-i18n="dashboardAtSignIn">Start Dashboard on Boot</span>
               <strong id="dashboardStartupText" aria-live="polite">loading</strong>
+              <p id="dashboardStartupHint" class="integration-hint"></p>
             </div>
             <div class="connection-actions">
               <button id="enableDashboardStartupBtn" type="button" data-i18n="enable">Enable</button>
+              <button id="enableDashboardStartupAdminBtn" class="secondary" type="button" data-i18n="enableAsAdmin">Enable as Admin</button>
               <button id="disableDashboardStartupBtn" class="secondary" type="button" data-i18n="disable">Disable</button>
             </div>
           </div>
@@ -100,9 +104,11 @@
             <div>
               <span data-i18n="connectionAtSignIn">Start Connection on Boot</span>
               <strong id="connectionStartupText" aria-live="polite">loading</strong>
+              <p id="connectionStartupHint" class="integration-hint"></p>
             </div>
             <div class="connection-actions">
               <button id="enableConnectionStartupBtn" type="button" data-i18n="enable">Enable</button>
+              <button id="enableConnectionStartupAdminBtn" class="secondary" type="button" data-i18n="enableAsAdmin">Enable as Admin</button>
               <button id="disableConnectionStartupBtn" class="secondary" type="button" data-i18n="disable">Disable</button>
             </div>
           </div>
@@ -121,6 +127,7 @@
           </div>
         </div>
         <div class="job-grid" id="jobs"></div>
+        <div id="jobDetail" class="job-detail" hidden></div>
         <p id="jobsMessage" class="message" role="status" aria-live="polite"></p>
       </section>
 
@@ -130,190 +137,33 @@
             <h2 data-i18n="configuration">Configuration</h2>
             <div class="config-head-actions">
               <span id="configWriteState" class="pill">read</span>
-              <button type="submit" form="configForm" data-config-action data-i18n="apply">Apply</button>
             </div>
           </div>
           <form id="configForm" class="config-form">
-            <label class="wide">
-              <span data-i18n="codexHomeDir">Codex Config Directory</span>
-              <input name="codex.home_dir" type="text" autocomplete="off" placeholder="Default local .codex" />
-            </label>
-            <label>
-              <span data-i18n="sandbox">Sandbox</span>
-              <select name="private.codex_sandbox">
-                <option value="workspace-write">workspace-write</option>
-                <option value="read-only">read-only</option>
-                <option value="danger-full-access">danger-full-access</option>
-              </select>
-            </label>
-            <label>
-              <span data-i18n="timeoutSeconds">Timeout Seconds</span>
-              <input name="private.codex_timeout_sec" type="number" min="60" step="30" />
-            </label>
-            <label>
-              <span data-i18n="finalOutputIdle">Final Output Idle</span>
-              <input name="private.final_output_idle_grace_sec" type="number" min="0" step="5" />
-            </label>
-            <label>
-              <span data-i18n="maxConcurrentJobs">Max Concurrent Jobs</span>
-              <input name="jobs.max_concurrent" type="number" min="1" max="8" />
-            </label>
-            <label>
-              <span data-i18n="jobHistoryLimit">Job History Limit</span>
-              <input name="jobs.history_limit" type="number" min="1" max="1000" />
-            </label>
-            <label class="check">
-              <input name="jobs.auto_cleanup_enabled" type="checkbox" />
-              <span data-i18n="autoCleanupJobs">Auto clean job history</span>
-            </label>
-            <label class="check">
-              <input name="jobs.cleanup_delete_artifacts" type="checkbox" />
-              <span data-i18n="deleteJobArtifacts">Delete job artifacts</span>
-            </label>
-            <label>
-              <span data-i18n="replyMaxChars">Reply Max Chars</span>
-              <input name="reply.max_chars" type="number" min="500" step="100" />
-            </label>
-            <label>
-              <span data-i18n="defaultModel">Default Model</span>
-              <select name="models.default.model" data-model-select></select>
-            </label>
-            <label>
-              <span data-i18n="defaultReasoning">Default Reasoning</span>
-              <select name="models.default.reasoning_effort">
-                <option value="">config</option>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="xhigh">xhigh</option>
-              </select>
-            </label>
-            <label>
-              <span data-i18n="fastModel">Fast Model</span>
-              <select name="models.fast.model" data-model-select></select>
-            </label>
-            <label>
-              <span data-i18n="fastReasoning">Fast Reasoning</span>
-              <select name="models.fast.reasoning_effort">
-                <option value="">config</option>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="xhigh">xhigh</option>
-              </select>
-            </label>
-            <label>
-              <span data-i18n="defaultTier">Default Tier</span>
-              <input name="models.default.service_tier" type="text" />
-            </label>
-            <label>
-              <span data-i18n="fastTier">Fast Tier</span>
-              <input name="models.fast.service_tier" type="text" />
-            </label>
-            <label class="check">
-              <input name="public.allow_codex" type="checkbox" />
-              <span data-i18n="allowGroupCodex">Allow group /ask</span>
-            </label>
-            <label class="check">
-              <input name="public.treat_all_text_as_codex" type="checkbox" />
-              <span data-i18n="groupPlainText">Group plain text as task</span>
-            </label>
-            <label class="check">
-              <input name="private.treat_all_text_as_codex" type="checkbox" />
-              <span data-i18n="privatePlainText">Private plain text as task</span>
-            </label>
-            <label class="check">
-              <input name="private.polling_fallback_enabled" type="checkbox" />
-              <span data-i18n="privatePollingFallback">Private polling fallback</span>
-            </label>
-            <label class="check">
-              <input name="multimodal.download_incoming" type="checkbox" />
-              <span data-i18n="downloadIncomingMedia">Download incoming media</span>
-            </label>
-            <label class="check">
-              <input name="routing.accept_any_target" type="checkbox" />
-              <span data-i18n="acceptAny">Accept @any</span>
-            </label>
-            <label class="check">
-              <input name="routing.dispatch_to_peers" type="checkbox" />
-              <span data-i18n="dispatchToPeers">Peer forwarding</span>
-            </label>
-            <label class="check">
-              <input name="access.enable_preset_intent_matching" type="checkbox" />
-              <span data-i18n="matchPresetAliases">Match preset task aliases</span>
-            </label>
-            <label class="check">
-              <input name="access.resolve_contacts_enabled" type="checkbox" />
-              <span data-i18n="resolveContacts">Contact-assisted user matching</span>
-            </label>
-            <label>
-              <span data-i18n="contactCacheTtl">Contact Cache TTL</span>
-              <input name="access.contact_cache_ttl_sec" type="number" min="60" step="60" />
-            </label>
-            <label class="check">
-              <input name="sessions.enabled" type="checkbox" />
-              <span data-i18n="sessionsEnabled">Continue conversations</span>
-            </label>
-            <label>
-              <span data-i18n="sessionMode">Conversation Mode</span>
-              <select name="sessions.mode">
-                <option value="continuous" data-i18n="sessionModeContinuous">Continuous</option>
-                <option value="topic" data-i18n="sessionModeTopic">Topic</option>
-              </select>
-            </label>
-            <label class="check">
-              <input name="sessions.topic_reply_in_thread" type="checkbox" />
-              <span data-i18n="topicReplyInThread">Use Feishu thread topics</span>
-            </label>
-            <label class="check">
-              <input name="sessions.queue_while_running" type="checkbox" />
-              <span data-i18n="queueWhileRunning">Queue while running</span>
-            </label>
-            <label class="check">
-              <input name="reply.edit_status_message" type="checkbox" />
-              <span data-i18n="editStatusMessage">Edit status message</span>
-            </label>
-            <label class="check">
-              <input name="reply.show_details_by_default" type="checkbox" />
-              <span data-i18n="showDetailsByDefault">Show details by default</span>
-            </label>
-            <label class="check">
-              <input name="reply.show_progress_by_default" type="checkbox" />
-              <span data-i18n="showProgressByDefault">Show progress by default</span>
-            </label>
-            <label>
-              <span data-i18n="progressMaxLines">Progress Lines</span>
-              <input name="reply.progress_max_lines" type="number" min="1" max="20" step="1" />
-            </label>
-            <label>
-              <span data-i18n="statusInterval">Status Interval</span>
-              <input name="reply.status_update_interval_sec" type="number" min="3" step="1" />
-            </label>
-            <div class="wide runtime-options-wrap">
-              <div id="detectedCommands" class="detected-options"></div>
-              <div id="detectedSkills" class="detected-options"></div>
-              <div id="detectedModels" class="detected-options"></div>
-            </div>
-            <div class="wide access-editor-wrap">
-              <div class="section-head compact">
-                <h3 data-i18n="accessDirectory">Access Directory</h3>
-                <div class="connection-actions">
-                  <button id="addIdentityBtn" type="button" class="secondary" data-i18n="addUser">Add User</button>
-                  <button id="addUserGroupBtn" type="button" class="secondary" data-i18n="addUserGroup">Add User Group</button>
-                  <button id="addGroupBtn" type="button" class="secondary" data-i18n="addGroup">Add Group</button>
+            <div class="wide config-workbench" id="configWorkbench">
+              <aside class="config-target-sidebar">
+                <div class="config-target-head">
+                  <strong data-i18n="configurationTargets">Configuration Targets</strong>
+                  <div class="config-target-actions">
+                    <button id="addIdentityBtn" type="button" class="secondary" data-i18n="addUser">Add User</button>
+                    <button id="addUserGroupBtn" type="button" class="secondary" data-i18n="addUserGroup">Add User Group</button>
+                    <button id="addGroupBtn" type="button" class="secondary" data-i18n="addGroup">Add Group</button>
+                    <button id="discoverAccessBtn" type="button" class="secondary" data-i18n="discoverAccess">Discover</button>
+                  </div>
                 </div>
-              </div>
-              <div id="accessEditor" class="access-editor"></div>
+                <label class="access-search">
+                  <span data-i18n="searchConfigTargets">Search defaults, users, groups, chats</span>
+                  <input id="configTargetSearch" type="text" autocomplete="off" spellcheck="false" inputmode="search" />
+                </label>
+                <div id="configTargetList" class="access-target-list"></div>
+              </aside>
+              <section id="configTargetDetail" class="config-target-detail"></section>
             </div>
-            <label class="wide">
-              <span data-i18n="presetTasksJson">Preset Tasks JSON</span>
-              <textarea name="preset_tasks" data-json="object" rows="12"></textarea>
-            </label>
             <div class="wide config-actions-bar">
+              <span id="configMessage" class="message config-inline-message config-actions-message" role="status" aria-live="polite" data-config-message></span>
               <button type="submit" data-i18n="apply">Apply</button>
             </div>
           </form>
-          <p id="configMessage" class="message" role="status" aria-live="polite"></p>
         </div>
 
         <div class="panel">

@@ -9,27 +9,26 @@
   "workspaces": {
     "default": "C:\\path\\to\\workspace"
   },
-  "commands": {
-    "available": [
-      "help",
-      "status",
-      "history",
-      "capabilities",
-      "peers",
-      "sessions",
-      "new-session",
-      "doctor",
-      "auth",
-      "review-update"
-    ]
-  },
   "skills": {
     "available": [
       "feishu",
       "lark-im",
       "lark-event",
+      "lark-doc",
+      "lark-base",
+      "lark-sheets",
+      "lark-calendar",
+      "lark-task",
+      "lark-wiki",
+      "lark-drive",
+      "lark-minutes",
       "feishu-codex-bridge"
     ]
+  },
+  "assistant": {
+    "display_name": "飞书助手",
+    "identity_prompt": "你是飞书助手，一个运行在飞书/Lark聊天里的工作助手。直接、简洁地回答用户问题。",
+    "hide_internal_identity": true
   },
   "models": {
     "available": [
@@ -69,19 +68,11 @@
     "default_policy": {
       "allow_codex": false,
       "unrestricted": false,
-      "show_details": false,
-      "show_progress": false,
-      "commands": [
-        "help",
-        "status",
-        "history",
-        "capabilities",
-        "sessions"
-      ],
       "tasks": [],
       "skills": [],
       "models": []
     },
+    "default_template": "no-access",
     "identities": {
       "admin": {
         "label": "Admin User",
@@ -96,11 +87,6 @@
         ],
         "allow_codex": true,
         "unrestricted": true,
-        "show_details": false,
-        "show_progress": false,
-        "commands": [
-          "*"
-        ],
         "tasks": [
           "*"
         ],
@@ -109,7 +95,8 @@
         ],
         "models": [
           "*"
-        ]
+        ],
+        "permission_preset": "user_group:admin"
       },
       "reviewer": {
         "label": "Reviewer",
@@ -124,56 +111,52 @@
         ],
         "allow_codex": false,
         "unrestricted": false,
-        "show_details": false,
-        "show_progress": false,
-        "commands": [
-          "help",
-          "status",
-          "history"
-        ],
         "tasks": [
-          "review-update"
+          "mobile-review"
         ],
-        "skills": [
-          "feishu",
-          "lark-doc",
-          "lark-base",
-          "lark-sheets"
-        ],
-        "models": [
-          "gpt-5.4-mini"
-        ]
+        "skills": [],
+        "models": [],
+        "permission_preset": "user_group:mobile-review"
       }
     },
     "user_groups": {
-      "review-team": {
-        "label": "Review Team",
+      "no-access": {
+        "label": "No Access",
         "enabled": true,
-        "members": [
-          "reviewer"
-        ],
+        "preset_only": true,
         "allow_codex": false,
         "unrestricted": false,
-        "show_details": false,
-        "show_progress": false,
-        "commands": [
-          "help",
-          "status",
-          "history",
-          "sessions"
-        ],
+        "tasks": [],
+        "skills": [],
+        "models": []
+      },
+      "admin": {
+        "label": "Admin",
+        "enabled": true,
+        "preset_only": true,
+        "allow_codex": true,
+        "unrestricted": true,
         "tasks": [
-          "review-update"
+          "*"
         ],
         "skills": [
-          "feishu",
-          "lark-doc",
-          "lark-base",
-          "lark-sheets"
+          "*"
         ],
         "models": [
-          "gpt-5.4-mini"
+          "*"
         ]
+      },
+      "mobile-review": {
+        "label": "Mobile Review",
+        "enabled": true,
+        "preset_only": true,
+        "allow_codex": false,
+        "unrestricted": false,
+        "tasks": [
+          "mobile-review"
+        ],
+        "skills": [],
+        "models": []
       }
     },
     "groups": {
@@ -191,23 +174,19 @@
         "unrestricted": false,
         "show_details": false,
         "show_progress": false,
-        "commands": [
-          "help",
-          "status",
-          "history",
-          "capabilities",
-          "sessions",
-          "new-session",
-          "review-update"
-        ],
         "tasks": [
-          "review-update"
+          "mobile-review"
         ],
         "skills": [
           "feishu",
           "lark-doc",
           "lark-base",
-          "lark-sheets"
+          "lark-sheets",
+          "lark-calendar",
+          "lark-task",
+          "lark-wiki",
+          "lark-drive",
+          "lark-minutes"
         ],
         "models": [
           "gpt-5.4",
@@ -218,7 +197,7 @@
     "resolve_contacts_enabled": false,
     "contact_cache_ttl_sec": 86400,
     "enable_preset_intent_matching": true,
-    "deny_message": "This account can only run approved preset bridge tasks."
+    "deny_message": "No permission."
   },
   "capabilities": {
     "modalities": [
@@ -232,6 +211,14 @@
       "feishu",
       "lark-im",
       "lark-event",
+      "lark-doc",
+      "lark-base",
+      "lark-sheets",
+      "lark-calendar",
+      "lark-task",
+      "lark-wiki",
+      "lark-drive",
+      "lark-minutes",
       "feishu-codex-bridge"
     ],
     "notes": [
@@ -254,11 +241,16 @@
     "default_workspace": "default",
     "codex_sandbox": "workspace-write",
     "codex_timeout_sec": 900,
+    "codex_active_output_grace_sec": 300,
+    "codex_timeout_extension_sec": 300,
+    "final_output_ready_sec": 3,
     "final_output_idle_grace_sec": 45,
     "codex_model": "",
     "polling_fallback_enabled": false,
     "poll_interval_sec": 5,
-    "treat_all_text_as_codex": true
+    "treat_all_text_as_codex": true,
+    "coalesce_forward_comment_enabled": true,
+    "coalesce_forward_comment_window_sec": 1.5
   },
   "public": {
     "enabled": true,
@@ -269,46 +261,140 @@
       "ou_xxx"
     ],
     "allow_codex": true,
-    "treat_all_text_as_codex": false,
-    "commands": {
-      "doctor": {
-        "executable": "lark-cli",
-        "args": [
-          "doctor"
-        ],
-        "timeout_sec": 60
-      },
-      "auth": {
-        "executable": "lark-cli",
-        "args": [
-          "auth",
-          "status"
-        ],
-        "timeout_sec": 60
-      }
-    }
+    "treat_all_text_as_codex": false
   },
   "preset_tasks": {
-    "review-update": {
+    "mobile-review": {
       "enabled": true,
-      "description": "Update or prepare review-tracking content in Feishu documents from a meeting note, doc, or user-provided review request.",
+      "description": "Mobile technical-design review: track review results, manage review documents, and handle review reminder requests.",
       "aliases": [
-        "review-update",
+        "mobile-review",
+        "移动端评审",
+        "移动端技术方案评审",
         "评审更新",
         "更新评审",
-        "技术方案评审",
-        "评审内容"
+        "新增评审文档",
+        "修改评审文档",
+        "删除评审文档",
+        "评审提醒"
       ],
       "workspace": "default",
+      "background": "Mobile technical-design review task collection. Reject unrelated requests.",
+      "scope": {
+        "allowed": [
+          "track mobile review status",
+          "manage mobile review documents",
+          "send mobile review reminders"
+        ],
+        "reject": "Reject requests outside mobile technical-design review."
+      },
+      "references": {
+        "tracking_base": {
+          "name": "移动端技术方案评审记录多维表格",
+          "url": "https://your-domain.feishu.cn/wiki/REVIEW_TRACKING_BASE?table=tbl_xxx&view=vew_xxx"
+        }
+      },
+      "review_schedule": {
+        "timezone": "Asia/Shanghai",
+        "weekdays": [
+          "tue",
+          "thu"
+        ],
+        "start_time": "14:00",
+        "end_time": "16:00"
+      },
+      "knowledge_bases": {
+        "RN": "https://your-domain.feishu.cn/wiki/RN_KNOWLEDGE_BASE",
+        "Android": "https://your-domain.feishu.cn/wiki/ANDROID_KNOWLEDGE_BASE",
+        "iOS": "https://your-domain.feishu.cn/wiki/IOS_KNOWLEDGE_BASE"
+      },
       "required_skills": [
         "feishu",
+        "lark-im",
         "lark-doc",
         "lark-base",
-        "lark-sheets"
+        "lark-sheets",
+        "lark-calendar",
+        "lark-task",
+        "lark-wiki",
+        "lark-drive",
+        "lark-minutes"
       ],
-      "output_expectations": "Return what was found, what was updated, and any missing information. If the input is not enough to update safely, ask for the specific missing URL or field.",
-      "prompt_template": "Use the listed Feishu/Lark skills to handle only this preset task: update or prepare review-tracking content.\\n\\nRequired skills: {required_skills}\\nTask description: {description}\\nOutput expectations: {output_expectations}\\n\\nUser-provided input:\\n{input}\\n"
+      "subtasks": [
+        {
+          "id": "track-review-result",
+          "type": "manual",
+          "enabled": true,
+          "label": "Track review results",
+          "aliases": [
+            "评审结果",
+            "更新评审状态"
+          ],
+          "description": "Track review results and create follow-up records for leftovers.",
+          "prompt": "Use meeting notes/video and the tracking Base to verify the review result before writing."
+        },
+        {
+          "id": "manage-review-doc",
+          "type": "manual",
+          "enabled": true,
+          "label": "Manage review documents",
+          "aliases": [
+            "新增评审文档",
+            "修改评审文档",
+            "删除评审文档"
+          ],
+          "description": "Add, modify, or delete review documents after duplicate/readability/knowledge-base checks.",
+          "prompt": "Check duplicates, document readability, and knowledge-base placement before updating the tracking Base. Do not assume a /wiki URL is already in the expected review knowledge base; first resolve it with lark-cli wiki spaces get_node and compare its space_id/parent_node_token with the configured target. If the source is already a Wiki node, move it with wiki +move --node-token <source_node_token> to the target space or parent; do not use --obj-type/--obj-token docs_to_wiki mode for an existing Wiki node. Use wiki +move --obj-type <type> --obj-token <token> --target-space-id <space_id> --apply only when the source is still a Drive document. Creating a copy is the final fallback only after the proper wiki +move path or move request is confirmed impossible and the user confirms; never treat one permission failure as enough reason to create a copy. After moving or submitting a move request, verify the final node location before writing the tracking Base."
+        },
+        {
+          "id": "submit-lock-reminder",
+          "type": "automatic",
+          "enabled": true,
+          "label": "Submit lock reminder",
+          "description": "Send the pre-review-day submit reminder without @all.",
+          "schedule": {
+            "weekdays": [
+              "mon",
+              "wed"
+            ],
+            "time": "18:00",
+            "catch_up_minutes": 5
+          },
+          "action": {
+            "input": "自动提醒提交：请在当前群发送提醒“即将锁定明天待评审文档，有待评审文档请及时提交”。不要 @任何人，不要 @所有人。",
+            "suppress_noop_reply": false,
+            "notify_completion": false
+          }
+        },
+        {
+          "id": "overload-check",
+          "type": "automatic",
+          "enabled": true,
+          "label": "Overload check",
+          "description": "Check same-day overload and only remind when non-leftover new docs exceed 6.",
+          "schedule": {
+            "weekdays": [
+              "tue",
+              "thu"
+            ],
+            "time": "10:00",
+            "catch_up_minutes": 5
+          },
+          "action": {
+            "input": "自动提醒超额：请检查今天待评审且非遗留项的新评审文档数量是否超过 6 个。如果超过则提醒当前群；否则只回复“无需提醒”。不要 @任何人，不要 @所有人。",
+            "suppress_noop_reply": true,
+            "notify_completion": false
+          }
+        }
+      ],
+      "output_expectations": "Only handle mobile-review content. Reject unrelated requests. Before writing Feishu Base records, verify the tracking record, notes/video links, and any ambiguous user intent.",
+      "prompt_template": "Only execute the mobile technical-design review parent task. Reject unrelated content.\\n\\nTask config:\\n{task_context}\\n\\nSubtasks:\\n{subtasks}\\n\\nSelected subtask:\\n{selected_subtask}\\n\\nSelected subtask instructions:\\n{subtask_prompt}\\n\\nAsk before unsafe writes.\\n\\nRequired skills: {required_skills}\\nTask description: {description}\\nOutput expectations: {output_expectations}\\n\\nUser input:\\n{input}\\n"
     }
+  },
+  "task_scheduler": {
+    "enabled": false,
+    "timezone": "Asia/Shanghai",
+    "poll_interval_sec": 30
   },
   "jobs": {
     "max_concurrent": 1,
@@ -342,6 +428,12 @@
   },
   "routing": {
     "accept_any_target": false,
+    "only_respond_to_bot_mention": true,
+    "private_only_respond_to_bot_mention": false,
+    "bot_mention_names": [
+      "飞书助手",
+      "my-codex-machine"
+    ],
     "dispatch_to_peers": false,
     "prefer_local_when_capable": true
   },

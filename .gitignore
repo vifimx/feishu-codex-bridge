@@ -18,6 +18,10 @@ jobs/
 *.pid
 *.log
 *.jsonl
+.analysis/
+analysis/
+captures/
+screenshots/raw/
 
 # Backups created by the dashboard config editor
 bridge.config.json.*.bak
@@ -30,6 +34,32 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+
+# Gradle / Kotlin
+.gradle/
+build/
+**/build/
+.kotlin/
+.playwright-mcp/
+local.properties
+
+# Local experimental alternate runtime prototypes; the published project is Python-first.
+bridge-runtime-jvm/
+compose-app/
+shared-core/
+kotlin-js-store/
+gradle/
+gradlew
+gradlew.bat
+build.gradle.kts
+settings.gradle.kts
+gradle.properties
+docs/KMP_V3_ARCHITECTURE.md
+Start-FeishuCodexBridgeV3.ps1
+Open-FeishuCodexBridgeDashboardV3.ps1
+Open-FeishuCodexBridgeDashboardV3.cmd
+Stop-FeishuCodexBridgeV3.ps1
+Stop-FeishuCodexBridgeV3.cmd
 
 # Windows / editors
 Thumbs.db

@@ -1,32 +1,50 @@
 # Feishu Codex Bridge
 
-Local bridge from Feishu/Lark bot messages to the Codex CLI.
+English | [简体中文](README.zh-CN.md)
 
-The project is designed to stay small and auditable:
+Feishu Codex Bridge is a local Python bridge that turns Feishu/Lark bot messages into `codex exec` jobs. It is designed for small, auditable personal or team deployments where Feishu is the chat entrypoint and Codex CLI does the local work.
 
-- Feishu/Lark transport uses the official `lark-cli`.
-- Codex execution uses the local `codex exec` command.
-- Runtime state is plain JSON/JSONL files.
-- The dashboard is served from localhost by the same Python runtime.
-- Real local config is intentionally ignored by git.
+The production runtime is the Python implementation in [feishu_codex_bridge.py](feishu_codex_bridge.py). Experimental Kotlin/Compose rewrite files are intentionally not part of the default release path until they reach parity with the Python bridge.
 
-## Features
+## Screenshots
 
-- Long-connection Feishu event subscriber via `lark-cli event +subscribe`.
-- Event-driven private and group message intake through `im.message.receive_v1`.
-- Optional private-chat polling fallback for direct messages, disabled by default when event delivery is available.
-- Allowlisted users, chats, workspaces, and fixed commands.
-- Tiered access: trusted users can run free-form Codex jobs, limited users can only run approved preset tasks and commands.
-- Conversation continuity: continuous chat mode or topic mode can continue the same Codex session through `codex exec resume`.
-- Queueing: follow-up messages are queued while a job is running; replies to bridge job messages are treated as guidance for that conversation.
-- Optional editable status messages: the bridge can update the original status reply and replace it with `最终结论` when the job finishes, falling back to a new reply if Feishu message editing is unavailable.
-- Visual access directory: commands, skills, models, users, and groups can be edited from the dashboard.
-- UTF-8 plain-text replies to avoid Chinese text and code block corruption.
-- Multimodal intake: image/file/audio/video resources can be downloaded through `lark-cli`.
-- Images are attached to `codex exec --image` when supported.
-- Per-request job records with status, logs, artifacts, output file paths, and Codex session deeplinks when detectable.
-- Local dashboard for status, logs, jobs, capabilities, and constrained config editing.
-- Future peer-routing metadata for multi-Codex deployments, disabled by default.
+![Dashboard overview](docs/assets/dashboard-overview.png)
+
+More screenshots and regeneration notes live in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
+
+## What It Does
+
+- Receives Feishu/Lark bot messages through the official `lark-cli` long-connection event stream.
+- Runs approved requests with the local `codex exec` command.
+- Supports private chats, group chats, threaded follow-ups, queued guidance, and resumable Codex sessions.
+- Uses explicit access policies for users, user groups, chats, workspaces, executable tasks, models, and skills.
+- Downloads supported incoming images/files/audio/video through `lark-cli`; images can be passed to Codex when the local CLI supports `--image`.
+- Serves a loopback-only dashboard for jobs, logs, capabilities, access policy editing, process control, and Windows integration.
+- Stores runtime state as local JSON/JSONL files so behavior stays inspectable.
+
+## Architecture
+
+The default architecture is Python-first:
+
+```text
+feishu_codex_bridge.py
+  CLI entrypoint, bridge coordinator, dashboard HTTP server, Lark transport,
+  job scheduling, Codex process execution, sessions, and replies.
+
+feishu_bridge/
+  config_store.py     config validation, typed coercion, dashboard write allowlist
+  runtime_paths.py    derived log/state/job/artifact paths
+
+dashboard/
+  index.html          local operations UI
+  dashboard.css
+  dashboard.js
+
+tests/
+  unittest coverage for config and bridge behavior
+```
+
+See [docs/PYTHON_ARCHITECTURE.md](docs/PYTHON_ARCHITECTURE.md) for the incremental refactor direction. The repository keeps the flat `feishu_codex_bridge.py` entrypoint so the current Windows launchers remain simple and compatible.
 
 ## Requirements
 
@@ -34,83 +52,34 @@ The project is designed to stay small and auditable:
 - Python 3.12 or newer.
 - `lark-cli` configured for a Feishu/Lark app.
 - `codex` CLI available on `PATH`.
+- Optional: GitHub CLI (`gh`) for repository maintenance.
 
-## Project Layout
+## Quick Start
 
-```text
-.
-  assets/
-    feishu-codex-bridge.ico
-  dashboard/
-    index.html
-    dashboard.css
-    dashboard.js
-  .github/workflows/ci.yml
-  bridge.config.example.json
-  feishu_codex_bridge.py
-  Initialize-GitHubCli.ps1
-  Initialize-LarkCli.ps1
-  Open-FeishuCodexBridgeDashboard.cmd
-  Open-FeishuCodexBridgeDashboard.ps1
-  Set-FeishuCodexBridgeWindowsIntegration.ps1
-  Start-FeishuCodexBridge.ps1
-  Stop-FeishuCodexBridge.cmd
-  Stop-FeishuCodexBridge.ps1
-  docs/GITHUB_AUTH.md
-  docs/OPEN_PLATFORM_EVENTS.md
-```
-
-## Configuration
-
-Copy the example config and fill in local values:
+Copy the example config:
 
 ```powershell
 Copy-Item .\bridge.config.example.json .\bridge.config.json
 ```
 
-Then edit:
+Edit at least these local values:
 
 - `machine_id`
-- `codex.home_dir` (optional; empty means the default local `.codex` directory)
 - `log_dir`
 - `state_dir`
 - `workspaces`
 - `private.allowed_sender_open_ids`
 - `private.allowed_chat_ids`
-- `private.polling_fallback_enabled`
 - `public.allowed_sender_open_ids`
 - `public.allowed_chat_ids`
 - `access.identities`
 - `access.user_groups`
 - `access.groups`
-- `models.default`
-- `models.fast`
-- `sessions`
 - `preset_tasks`
 
-`bridge.config.json` is ignored by git because it normally contains local paths, chat IDs, open IDs, and deployment choices.
+`bridge.config.json` is ignored by Git because it normally contains local paths, chat IDs, open IDs, and deployment decisions.
 
-The bridge discovers local Codex capabilities from `codex.home_dir`: `config.toml`, `models_cache.json`, `skills/`, plugin skill caches, and `~\.agents\skills`. Static `commands.available`, `skills.available`, and `models.available` entries are still supported as manual additions in JSON config/API writes, but the dashboard treats runtime-discovered commands, skills, and models as read-only option chips instead of exposing raw text boxes.
-
-## GitHub Maintenance
-
-Install and authenticate GitHub CLI:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Initialize-GitHubCli.ps1 -Login -SetupGit
-```
-
-Create a local ignored shell-token template:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Initialize-GitHubCli.ps1 -CreateLocalEnv
-```
-
-See [docs/GITHUB_AUTH.md](docs/GITHUB_AUTH.md) for browser login, token prompt, `GH_TOKEN`, and remote creation workflows.
-
-## Start / Stop
-
-Validate the runtime and config without connecting to Feishu:
+Validate without connecting to Feishu:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Start-FeishuCodexBridge.ps1 -DryRun
@@ -122,60 +91,18 @@ Start the bridge:
 powershell -ExecutionPolicy Bypass -File .\Start-FeishuCodexBridge.ps1
 ```
 
-Start the bridge without serving the dashboard, useful when the dashboard-only GUI is already running:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Start-FeishuCodexBridge.ps1 -NoDashboardServer
-```
-
-Stop the bridge, dashboard, and active bridge-started Codex jobs:
+Stop the bridge, dashboard, and bridge-started Codex jobs:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Stop-FeishuCodexBridge.ps1
 ```
 
-This project does not install a Windows service, Scheduled Task, or startup item by default. It runs only while one of the PowerShell launchers or a dashboard-started background bridge process is running.
-
-## Windows Integration
-
-The dashboard has a **Windows Integration** section for user-level shell integration:
-
-- **Add to Start Menu** creates top-level shortcuts under the current user's Start Menu programs folder.
-- The shortcuts are named **Feishu Codex Bridge Dashboard** and **Feishu Codex Bridge Stop**. They use `assets/feishu-codex-bridge.ico` as their icon and appear in Windows Search and **All apps**; Windows 11 pinned Start layout still requires manual pinning from Windows.
-- **Start Dashboard on Boot** creates a current-user Scheduled Task that starts the dashboard-only process after Windows user sign-in without opening a browser.
-- **Start Connection on Boot** creates a current-user Scheduled Task that starts the Feishu bridge connection after Windows user sign-in without serving another dashboard.
-
-The same actions can be run from PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action status
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action install-start-menu
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action enable-dashboard-startup
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action enable-connection-startup
-```
-
-Disable or remove them with:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action disable-dashboard-startup
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action disable-connection-startup
-powershell -ExecutionPolicy Bypass -File .\Set-FeishuCodexBridgeWindowsIntegration.ps1 -Action remove-start-menu
-```
-
-Startup tasks are not enabled by default. They are created only by the dashboard buttons or the commands above.
-
 ## Dashboard
 
-Start the dashboard without starting Feishu event listening:
+Start only the local dashboard:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Open-FeishuCodexBridgeDashboard.ps1
-```
-
-Restart the dashboard process after code updates:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\Open-FeishuCodexBridgeDashboard.ps1 -Restart
 ```
 
 Default URL:
@@ -184,38 +111,19 @@ Default URL:
 http://127.0.0.1:8765/
 ```
 
-The same dashboard is also served when the bridge is running and `health_server.enabled=true`. For manual GUI control, prefer the dashboard-only launcher above, then use the **Start Connection** and **Stop Connection** buttons. In that mode the GUI stays open while the Feishu event subscriber runs as a separate background bridge process.
+The dashboard supports English and Simplified Chinese. It can show bridge status, recent jobs, logs, discovered Codex capabilities, editable access policies, and user-level Windows shortcuts/startup tasks. Process control and config writes are loopback-only and can be disabled with:
 
-The dashboard supports English and Simplified Chinese. On first load it uses the browser language list and switches to Simplified Chinese when a Chinese locale is detected; after the user chooses a language, the choice is saved in browser `localStorage`.
-
-Dashboard endpoints:
-
-```text
-GET  /                         HTML dashboard
-GET  /api/status               machine, capability, pid, and job summary
-GET  /api/jobs?limit=30        recent job list
-GET  /api/jobs/<job_id>        full job JSON
-POST /api/jobs/cleanup         loopback-only cleanup using jobs.history_limit
-GET  /api/logs?limit=120       recent bridge log entries
-GET  /api/config               current config and editable key allowlist
-POST /api/config               loopback-only config patch for allowlisted fields
-POST /api/connection/start     loopback-only start of the Feishu bridge connection
-POST /api/connection/stop      loopback-only stop of the Feishu bridge connection
-GET  /api/windows-integration  Start Menu and startup-task status
-POST /api/windows-integration/<action>
+```json
+{
+  "dashboard": {
+    "allow_config_write": false,
+    "allow_process_control": false,
+    "allow_shell_integration": false
+  }
+}
 ```
 
-Config writes are intentionally constrained:
-
-- The server must see the client as loopback.
-- `dashboard.allow_config_write` must be true.
-- Only the allowlisted keys in `feishu_codex_bridge.py` can be changed.
-- Every write creates a timestamped `bridge.config.json.*.bak` backup before replacing the config.
-- Some changes, such as `health_server.*`, need a restart to affect the already-running server.
-
-Process control is also loopback-only and can be disabled with `dashboard.allow_process_control=false`. Windows shell integration changes are loopback-only and can be disabled with `dashboard.allow_shell_integration=false`.
-
-Keep the dashboard bound to `127.0.0.1`. Do not expose it on a public interface without adding an authentication layer.
+Keep the dashboard bound to `127.0.0.1` unless an external authentication layer is added.
 
 ## Feishu Commands
 
@@ -234,210 +142,110 @@ Built-ins:
 /cmd history
 /cmd capabilities
 /cmd peers
+/cmd sessions
+/cmd new-session
 ```
 
-Fixed commands from `bridge.config.json`:
-
-```text
-/cmd doctor
-/cmd auth
-```
-
-Preset tasks:
+Executable tasks:
 
 ```text
 /cmd <preset_task> [input]
 /task <preset_task> [input]
+/task <preset_task>:<subtask_id> [input]
 ```
 
-Explicit tasks:
+Free-form Codex jobs for users or chats with `allow_codex=true`:
 
 ```text
 /ask [@node] [workspace=name] <prompt>
-```
-
-Private chat can treat all allowlisted text as tasks when `private.treat_all_text_as_codex=true`.
-
-Conversation control:
-
-```text
-/cmd sessions
-/cmd new-session
 /ask --new [workspace=name] <prompt>
-```
-
-Model and skill options:
-
-```text
 /ask mode=fast <prompt>
 /ask model=gpt-5.4 reasoning=xhigh <prompt>
 /ask skills=feishu,lark-doc <prompt>
 ```
 
-When `sessions.enabled=true`, the bridge stores conversation records and resumes completed Codex sessions through `codex exec resume`. `sessions.mode=continuous` keeps the existing behavior: one conversation per private chat or group chat scope, so normal follow-up messages stay in the current bridge conversation. A reply to a bridge status/final card is attached to that job's conversation and is queued as guidance if the job is still running.
-
-`sessions.mode=topic` makes each triggering message start its own topic conversation. The bridge replies to the trigger with `--reply-in-thread` when `sessions.topic_reply_in_thread=true`, keeps the editable status card inside that topic, treats replies to a running card as guidance, treats new messages inside the same topic as queued follow-ups, and treats task triggers outside the topic as new conversations. Use `/cmd new-session` or `/ask --new` to reset the current topic's Codex session without changing the topic.
-
-When `reply.edit_status_message=true`, the bridge posts job status as an interactive Feishu card, then edits that same card as the job moves from queued to running to finished. The final edited card uses the `最终结论` label. If Feishu rejects card editing, the bridge logs the failure and sends a normal final text reply instead. User-facing cards use neutral wording such as `已收到消息`, `正在处理`, and `处理完成`.
-
-Detailed parameters such as job IDs, model names, workspaces, conversation keys, and session links are hidden by default when `reply.show_details_by_default=false`. Grant `show_details=true` on a specific identity, user group, or chat group to expose those details for operators. Execution progress such as command/tool events and short output summaries is controlled separately by `show_progress`; hidden model reasoning is not exposed.
-
-## Event Delivery
-
-The bridge is intended to receive private and group messages through Feishu/Lark long-connection events rather than polling. The required app-side setup is:
-
-- Bot capability enabled.
-- Event delivery method set to long connection.
-- `im.message.receive_v1` subscribed and published.
-- Bot/app permissions that allow receiving user private messages sent to the bot and the required group-message mode.
-
-The runtime subscribes with:
-
-```powershell
-lark-cli event +subscribe --as bot --event-types <configured event_types> --compact --quiet
-```
-
-Private chat polling is only a fallback. Keep `private.polling_fallback_enabled=false` when `im.message.receive_v1` is working. Enable it only if event delivery is unavailable and the bot has the list-message permission needed by `im +chat-messages-list`.
-
-The current app event-page check is recorded in [docs/OPEN_PLATFORM_EVENTS.md](docs/OPEN_PLATFORM_EVENTS.md). As of 2026-04-23, the page shows long connection enabled, `im.message.receive_v1` added, and the private-message permission `读取用户发给机器人的单聊消息` already enabled.
-
-Group chat can do the same when `public.treat_all_text_as_codex=true`; keep this false for noisy groups.
+Private chats can treat all allowlisted text as tasks when `private.treat_all_text_as_codex=true`. Group chats should normally require a bot mention or explicit command unless the group is tightly controlled.
 
 ## Access Model
 
-The bridge uses an access directory instead of only raw ID lists. `label` is only a dashboard display label. Identity matching uses explicit Feishu IDs such as `open_ids` first, and can also use configured `names`, `emails`, `mobiles`, and `aliases` when the incoming event or resolved contact profile contains those values. If `access.resolve_contacts_enabled=true` and the current app has contact scopes, the bridge resolves the sender's contact profile before matching. If contact resolution is unavailable, readable names and emails still help dashboard search but do not replace `open_ids`.
+Access is resolved from:
 
-User-group and chat-group `members` values match identity keys such as `admin`, raw sender IDs such as `ou_xxx`, or everyone when empty or `"*"`. Chat groups are selected by `chat_ids`; any group aliases are only display/search metadata in the dashboard.
+- `access.default_policy`
+- matching `access.identities`
+- matching `access.user_groups`
+- the current `access.groups` chat policy
+
+Chat policy is authoritative for that chat. If a chat group exists and the sender is not included by it, the sender falls back to the default policy instead of inheriting broad user grants.
+
+Use constrained executable tasks for routine workflows:
 
 ```json
-"access": {
-  "identities": {
-    "admin": {
-      "label": "Admin User",
-      "open_ids": ["ou_admin_xxx"],
-      "emails": ["admin@example.com"],
-      "aliases": ["admin", "Alice Zhang"],
-      "allow_codex": true,
-      "unrestricted": true,
-      "commands": ["*"],
-      "tasks": ["*"],
-      "skills": ["*"],
-      "models": ["*"]
-    }
-  },
-  "user_groups": {
-    "review-team": {
-      "label": "Review Team",
+{
+  "preset_tasks": {
+    "mobile-review": {
       "enabled": true,
-      "members": ["reviewer"],
-      "commands": ["help", "status", "sessions"],
-      "tasks": ["review-update"],
-      "skills": ["feishu", "lark-doc"],
-      "models": ["gpt-5.4-mini"]
-    }
-  },
-  "groups": {
-    "botx-test": {
-      "label": "botx test group",
-      "chat_ids": ["oc_group_xxx"],
-      "members": ["admin"],
-      "allow_codex": true,
-      "commands": ["help", "status", "new-session"],
-      "tasks": ["review-update"],
-      "skills": ["feishu", "lark-doc"],
-      "models": ["gpt-5.4", "gpt-5.4-mini"]
+      "aliases": ["mobile-review", "移动端评审", "评审更新"],
+      "workspace": "default",
+      "required_skills": ["feishu", "lark-doc", "lark-base"],
+      "prompt_template": "Handle only this approved workflow. Reject unrelated requests.\n\nUser input:\n{input}\n"
     }
   }
 }
 ```
 
-Permissions are additive across the matching identity, all matching custom user groups, and the current chat group. `unrestricted=true` or `["*"]` grants the full configured set. A user group or chat group can grant permissions to specific `members` by identity key, raw sender id, or to everyone when `members` is empty or contains `"*"`.
+Use `allow_codex=true` only for trusted operators. Use `unrestricted=true` only for administrators who are allowed to bypass task/model/skill limits.
 
-Constrained users should omit `allow_codex` and grant only specific `commands`, `tasks`, `skills`, and `models`. Their messages can only map to configured preset tasks:
+## Event Delivery
 
-```json
-"preset_tasks": {
-  "review-update": {
-    "enabled": true,
-    "aliases": ["review-update", "评审更新", "更新评审"],
-    "workspace": "default",
-    "required_skills": ["feishu", "lark-doc", "lark-base", "lark-sheets"],
-    "prompt_template": "Use the listed Feishu/Lark skills to handle only this preset task...\\n{input}\\n"
-  }
-}
+The bridge is intended to use Feishu/Lark long-connection events:
+
+```powershell
+lark-cli event +subscribe --as bot --filter '^(<event_types_regex>)$' --compact --quiet
 ```
 
-Preset recognition is deterministic: explicit `/task <id>`, `/cmd <id>`, or alias matching when `access.enable_preset_intent_matching=true`. The preset prompt may instruct Codex to use existing skills to understand Feishu documents, Base records, sheets, or review content, but the task scope remains the configured preset.
+Private polling is a fallback only. Keep `private.polling_fallback_enabled=false` when `im.message.receive_v1` is working.
 
-## Job State
+See [docs/OPEN_PLATFORM_EVENTS.md](docs/OPEN_PLATFORM_EVENTS.md) for the sanitized app-side checklist.
 
-Each Codex request becomes a JSON job under:
+## Security And Privacy
 
-```text
-<state_dir>/jobs/job-YYYYMMDD-HHMMSS-XXXXXXXX.json
-```
-
-The job records:
-
-- prompt, workspace, and cwd
-- source chat/message/sender
-- downloaded attachment paths
-- status: `queued`, `running`, `completed`, `failed`, `timed_out`, or `stopped`
-- worker and Codex process IDs
-- output file paths
-- inferred Codex session path and `codex://threads/<id>` deeplink when detectable
-
-The runtime waits for `codex exec` to exit instead of killing it when the output file first appears. This avoids interrupting local Codex-managed child work, including subagent-style workflows if the local Codex runtime supports them.
-
-Job records are reconciled when read by the dashboard or status API. If a queued/running job no longer has live worker or Codex PIDs and `last-message.txt` exists, it is marked `completed`; otherwise it is marked `failed` with available worker/Codex stderr.
-
-Dashboard job history is scrollable and can be retained with:
-
-```json
-"jobs": {
-  "history_limit": 50,
-  "auto_cleanup_enabled": true,
-  "cleanup_delete_artifacts": true
-}
-```
-
-Cleanup only removes terminal jobs (`completed`, `failed`, `timed_out`, `stopped`) beyond the retention limit. Active queued/running jobs are not removed. When `cleanup_delete_artifacts=true`, the matching job working directory and downloaded artifact directory are deleted together with the job JSON.
-
-## Security
-
+- Do not commit `bridge.config.json`, token files, logs, job state, attachments, or local analysis dumps.
 - Keep explicit sender/chat/workspace allowlists.
-- Put free-form operators in `access.identities` with explicit `allow_codex=true` or `unrestricted=true`.
-- Keep constrained users restricted to explicit `commands`, `tasks`, `skills`, and `models`.
-- Use bot identity for bridge replies.
-- Use user identity only for tasks that clearly require user-owned Feishu resources and already have valid user-token scopes.
+- Keep dashboard and health endpoints on loopback.
+- Use bot identity for normal bridge replies.
+- Use user identity only for tasks that clearly need user-owned Feishu resources and already have valid user-token scopes.
 - Do not add Open Platform permissions, request new scopes, publish app versions, or change event subscriptions from this bridge unless that is the explicit administrative task.
-- Keep dashboard and health endpoints on loopback unless protected by a separate authentication and network layer.
-- Keep logs enabled for auditability.
+- Review generated screenshots before committing them; they should use placeholder IDs and sample state only.
 
-## Multi-Codex Routing
+## Repository Maintenance
 
-`bridge.config.example.json` includes future peer metadata:
+Install and authenticate GitHub CLI:
 
-```json
-"routing": {
-  "accept_any_target": false,
-  "dispatch_to_peers": false,
-  "prefer_local_when_capable": true
-},
-"peers": {
-  "enabled": false,
-  "nodes": []
-}
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Initialize-GitHubCli.ps1 -Login -SetupGit
 ```
 
-Actual remote task dispatch is disabled by default. Do not enable it until there is an authenticated queue or signed request protocol, otherwise multiple Codex machines can duplicate work or accept untrusted prompts.
+Create a local ignored shell-token template:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Initialize-GitHubCli.ps1 -CreateLocalEnv
+```
+
+See [docs/GITHUB_AUTH.md](docs/GITHUB_AUTH.md) for browser login, token prompt, `GH_TOKEN`, and remote creation workflows.
 
 ## Validation
 
+Run the same checks locally before committing:
+
 ```powershell
 python -m py_compile .\feishu_codex_bridge.py
+python -m unittest discover -s tests
 Get-Content -Raw .\bridge.config.example.json | ConvertFrom-Json | Out-Null
 foreach ($script in Get-ChildItem -Filter *.ps1) {
   $null = [scriptblock]::Create((Get-Content -Raw $script.FullName))
 }
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

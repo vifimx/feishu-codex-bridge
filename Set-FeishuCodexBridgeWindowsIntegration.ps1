@@ -4,8 +4,10 @@ param(
     "install-start-menu",
     "remove-start-menu",
     "enable-dashboard-startup",
+    "enable-dashboard-startup-admin",
     "disable-dashboard-startup",
     "enable-connection-startup",
+    "enable-connection-startup-admin",
     "disable-connection-startup"
   )]
   [string]$Action = "status",

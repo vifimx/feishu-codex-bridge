@@ -163,6 +163,24 @@ button.danger:hover:not(:disabled) {
   background: #9a3412;
 }
 
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #eef2f7;
+  color: var(--ink);
+  padding: 7px 10px;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.button-link:hover {
+  background: #e2e8f0;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -310,6 +328,13 @@ button.danger:hover:not(:disabled) {
   justify-content: flex-end;
 }
 
+.config-inline-message {
+  margin: 0;
+  min-height: 0;
+  max-width: min(420px, 100%);
+  text-align: right;
+}
+
 .split {
   display: grid;
   grid-template-columns: 1fr;
@@ -355,6 +380,190 @@ button.danger:hover:not(:disabled) {
   overflow-wrap: anywhere;
 }
 
+.job.active {
+  border-color: rgba(37, 99, 235, 0.65);
+  background: #eef4ff;
+}
+
+.job-detail-button {
+  margin-top: 12px;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.job-detail {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 16px;
+}
+
+.job-detail[hidden] {
+  display: none;
+}
+
+.job-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.job-detail-head h3 {
+  overflow-wrap: anywhere;
+}
+
+.job-detail .eyebrow {
+  color: var(--muted);
+}
+
+.job-detail-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.job-detail-grid section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.detail-kv {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.detail-kv div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 9px;
+  min-width: 0;
+}
+
+.detail-kv span,
+.job-file-card header span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.detail-kv strong {
+  display: block;
+  margin-top: 3px;
+  font-weight: 560;
+  overflow-wrap: anywhere;
+}
+
+.job-file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.job-file-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 12px;
+}
+
+.job-file-card header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.job-file-card strong,
+.job-file-card code,
+.job-file-card p {
+  overflow-wrap: anywhere;
+}
+
+.job-file-card code {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+}
+
+.file-preview {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.file-preview img,
+.file-preview video,
+.file-preview iframe {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  border: 0;
+  object-fit: contain;
+}
+
+.file-preview audio {
+  display: block;
+  width: 100%;
+}
+
+.file-preview iframe {
+  height: 420px;
+}
+
+.file-text-preview,
+.raw-json,
+.job-events pre {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e5edf8;
+  padding: 10px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.file-hint {
+  color: var(--amber);
+  font-size: 12px;
+}
+
+.job-events {
+  display: grid;
+  gap: 8px;
+}
+
+.job-events > div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 10px;
+}
+
+.job-events code {
+  color: var(--muted);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+}
+
+.job-events strong {
+  overflow-wrap: anywhere;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -368,6 +577,7 @@ button.danger:hover:not(:disabled) {
 }
 
 .pill.completed,
+.pill.round_completed,
 .pill.ok {
   background: var(--green);
 }
@@ -397,8 +607,73 @@ button.danger:hover:not(:disabled) {
 
 .config-form {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.config-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  overflow: clip;
+}
+
+.config-group summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 13px 14px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.config-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.config-group summary::after {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.config-group[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.config-group[open] summary::after {
+  content: "-";
+}
+
+.config-group summary small {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.config-group-grid {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  padding: 14px;
+}
+
+.response-target-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .config-form label {
@@ -495,9 +770,6 @@ button.danger:hover:not(:disabled) {
 .runtime-options-wrap {
   display: grid;
   gap: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfe;
   padding: 14px;
 }
 
@@ -555,16 +827,242 @@ button.danger:hover:not(:disabled) {
   bottom: 0;
   z-index: 5;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
   padding: 12px 0 0;
   backdrop-filter: blur(8px);
 }
 
-.config-actions-bar button,
-.config-head-actions button {
+.config-actions-bar button {
   min-width: 120px;
+}
+
+.config-actions-message {
+  flex: 1 1 auto;
+  min-width: min(320px, 100%);
+  text-align: left;
+  max-width: none;
+}
+
+.config-workbench {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.config-target-sidebar {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  position: sticky;
+  top: 14px;
+}
+
+.config-target-head {
+  display: grid;
+  gap: 10px;
+}
+
+.config-target-head strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.config-target-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.config-target-actions button {
+  min-height: 36px;
+  width: 100%;
+}
+
+.config-target-detail {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.config-global-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.default-config-stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.config-global-card h4,
+.config-target-detail h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.global-json-editor {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.preset-task-json {
+  display: none;
+}
+
+.preset-task-editor,
+.scheduled-task-editor {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  padding: 14px;
+  min-width: 0;
+}
+
+.preset-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preset-task-head h4 {
+  margin: 0;
+}
+
+.preset-task-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.preset-task-list {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.preset-task-detail,
+.scheduled-task-detail {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.task-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.task-section:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.task-section h5 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.scheduled-global {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.subtask-card {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0;
+  overflow: clip;
+}
+
+.subtask-summary {
+  display: grid;
+  grid-template-columns: 20px auto minmax(0, 1fr) minmax(110px, auto) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.subtask-summary::-webkit-details-marker {
+  display: none;
+}
+
+.subtask-summary::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #fff;
+  font-weight: 700;
+}
+
+.subtask-card[open] .subtask-summary::before {
+  content: "-";
+}
+
+.subtask-summary strong,
+.subtask-summary code {
+  overflow-wrap: anywhere;
+}
+
+.subtask-summary code {
+  color: var(--muted);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+}
+
+.subtask-body {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 12px;
+}
+
+.schedule-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.schedule-field strong {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .access-editor-wrap {
@@ -602,6 +1100,67 @@ button.danger:hover:not(:disabled) {
   max-height: 620px;
   overflow: auto;
   padding-right: 4px;
+}
+
+.access-target-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  overflow: clip;
+}
+
+.access-target-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  padding: 9px 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.access-target-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-target-group summary::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.access-target-group[open] summary::before {
+  content: "-";
+}
+
+.access-target-group summary span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.access-target-group summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.access-target-group-list {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding: 8px;
 }
 
 .access-target {
@@ -671,6 +1230,49 @@ button.danger:hover:not(:disabled) {
   padding: 7px 10px;
 }
 
+.access-card-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.access-card-actions label {
+  display: grid;
+  gap: 4px;
+  min-width: min(180px, 100%);
+}
+
+.access-card-actions label span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.access-card-actions select {
+  min-height: 34px;
+}
+
+.access-preset-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  max-width: 260px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--muted);
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.access-default-copy {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .access-card-head,
 .access-card-grid {
   display: grid;
@@ -691,6 +1293,7 @@ button.danger:hover:not(:disabled) {
   gap: 10px;
 }
 
+.access-permissions > section,
 .access-permissions > div {
   min-width: 0;
   border: 1px solid var(--line);
@@ -699,11 +1302,76 @@ button.danger:hover:not(:disabled) {
   padding: 10px;
 }
 
+.access-mode-hint,
+.access-permissions small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.access-mode-hint {
+  margin: -2px 0 10px;
+}
+
 .access-permissions strong {
   display: block;
   margin-bottom: 6px;
   color: var(--ink);
   font-weight: 600;
+}
+
+.access-permissions small {
+  margin: -2px 0 8px;
+}
+
+.access-overrides {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.access-overrides summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.access-overrides summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.access-overrides-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.access-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.access-overrides-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.access-overrides-section h5 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
 }
 
 .choice-group {
@@ -837,11 +1505,19 @@ button.danger:hover:not(:disabled) {
   .overview,
   .split,
   .config-form,
+  .config-group-grid,
+  .config-workbench,
+  .preset-task-layout,
+  .scheduled-global,
   .access-layout,
   .access-permissions,
+  .access-overrides-grid,
+  .access-settings-grid,
+  .detail-kv,
   .kv,
   .access-card-head,
-  .access-card-grid {
+  .access-card-grid,
+  .access-card-actions {
     grid-template-columns: 1fr;
   }
 
@@ -855,5 +1531,13 @@ button.danger:hover:not(:disabled) {
 
   .integration-row {
     grid-template-columns: 1fr;
+  }
+
+  .config-actions-bar {
+    align-items: stretch;
+  }
+
+  .config-actions-bar button {
+    width: 100%;
   }
 }

@@ -2,13 +2,15 @@
 
 Last checked: 2026-04-23
 
-App: `cli_a928e035c478dcd6` (`mi-feishu-mcp-helper`)
+App: `<your_lark_app_id>` (`<your_app_name>`)
 
 Source page:
 
 ```text
-https://open.feishu.cn/app/cli_a928e035c478dcd6/event
+https://open.feishu.cn/app/<your_lark_app_id>/event
 ```
+
+This file is a sanitized checklist. Do not commit real app IDs, tenant names, screenshots, or Open Platform URLs that identify a private deployment.
 
 ## Delivery Mode
 
@@ -21,8 +23,10 @@ The Event & Callback page shows the event subscription mode as long connection:
 The local bridge therefore uses:
 
 ```powershell
-lark-cli event +subscribe --as bot --event-types <event_types> --compact --quiet
+lark-cli event +subscribe --as bot --filter '^(<event_types_regex>)$' --compact --quiet
 ```
+
+Use catch-all subscription with a local `--filter` because this app also has unrelated task, document, calendar, and drive events enabled. Passing only bridge event types through `--event-types` can leave those unrelated platform events without a registered CLI handler and make the subscriber exit.
 
 ## Bridge-Relevant Events
 
